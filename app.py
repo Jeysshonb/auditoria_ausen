@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from io import BytesIO
+import base64
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -155,6 +156,29 @@ def convertir_df_a_csv(df):
     """Convierte DataFrame a CSV en memoria"""
     return df.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
 
+def crear_link_descarga(data, filename, file_label):
+    """Crea un link de descarga automática"""
+    b64 = base64.b64encode(data).decode()
+    
+    # Determinar el mime type
+    if filename.endswith('.csv'):
+        mime_type = 'text/csv'
+    elif filename.endswith('.xlsx'):
+        mime_type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    else:
+        mime_type = 'application/octet-stream'
+    
+    # HTML con auto-descarga
+    href = f'''
+    <a href="data:{mime_type};base64,{b64}" 
+       download="{filename}" 
+       style="display:inline-block;padding:0.5rem 1rem;background-color:#4CAF50;color:white;
+              text-decoration:none;border-radius:5px;margin:5px 0;">
+        📥 {file_label}
+    </a>
+    '''
+    return href
+
 # ============================================================================
 # PASO 1: PROCESAMIENTO INICIAL
 # ============================================================================
@@ -271,13 +295,12 @@ def paso1_procesamiento_inicial():
                 st.dataframe(df_final.head(10), use_container_width=True)
                 
                 # Botón de descarga
+                st.markdown("### 💾 Descargar Resultado del Paso 1")
                 csv_data = convertir_df_a_csv(df_final)
-                st.download_button(
-                    label="📥 Descargar CSV Procesado",
-                    data=csv_data,
-                    file_name="ausentismo_procesado_especifico.csv",
-                    mime="text/csv"
-                )
+                link_descarga = crear_link_descarga(csv_data, "ausentismo_procesado_especifico.csv", "Descargar CSV Procesado")
+                st.markdown(link_descarga, unsafe_allow_html=True)
+                
+                st.info("💡 Haz clic en el botón verde para descargar el archivo")
                 
                 # Botón para continuar
                 st.markdown("---")
@@ -397,12 +420,8 @@ def paso2_validaciones_merge():
                 if len(df_errores_sena) > 0:
                     st.dataframe(df_errores_sena[['id_personal', 'nombre_completo', 'Relación laboral', 'external_name_label']].head(10))
                     excel_sena = convertir_df_a_excel(df_errores_sena)
-                    st.download_button(
-                        "📥 Descargar Errores SENA (Excel)",
-                        data=excel_sena,
-                        file_name="Sena_error_validar.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    )
+                    link_sena = crear_link_descarga(excel_sena, "Sena_error_validar.xlsx", "Descargar Errores SENA")
+                    st.markdown(link_sena, unsafe_allow_html=True)
                 
                 # Validación LEY 50
                 st.write("### 📜 Validación Ley 50")
@@ -423,12 +442,8 @@ def paso2_validaciones_merge():
                 if len(df_errores_ley50) > 0:
                     st.dataframe(df_errores_ley50[['id_personal', 'nombre_completo', 'Relación laboral', 'external_name_label']].head(10))
                     excel_ley50 = convertir_df_a_excel(df_errores_ley50)
-                    st.download_button(
-                        "📥 Descargar Errores Ley 50 (Excel)",
-                        data=excel_ley50,
-                        file_name="Ley_50_error_validar.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    )
+                    link_ley50 = crear_link_descarga(excel_ley50, "Ley_50_error_validar.xlsx", "Descargar Errores Ley 50")
+                    st.markdown(link_ley50, unsafe_allow_html=True)
                 
                 # CREAR COLUMNAS DE VALIDACIÓN
                 st.markdown("---")
@@ -575,19 +590,11 @@ def paso2_validaciones_merge():
                 # Mostrar alertas
                 if alertas_generadas:
                     st.write(f"📋 Se generaron **{len(alertas_generadas)}** archivos de alerta:")
+                    st.write("**Haz clic en cada botón verde para descargar:**")
                     for nombre, df_alert, cantidad in alertas_generadas:
-                        col1, col2 = st.columns([3, 1])
-                        with col1:
-                            st.write(f"• {nombre}")
-                        with col2:
-                            excel_alert = convertir_df_a_excel(df_alert)
-                            st.download_button(
-                                f"📥 Descargar ({cantidad})",
-                                data=excel_alert,
-                                file_name=nombre,
-                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                key=f"alert_{nombre}"
-                            )
+                        excel_alert = convertir_df_a_excel(df_alert)
+                        link_alert = crear_link_descarga(excel_alert, nombre, f"{nombre} ({cantidad} registros)")
+                        st.markdown(link_alert, unsafe_allow_html=True)
                 else:
                     st.success("✅ No se encontraron alertas")
                 
@@ -595,14 +602,8 @@ def paso2_validaciones_merge():
                 st.markdown("---")
                 st.write("### 💾 Descargar Archivo Completo con Validaciones")
                 csv_validaciones = convertir_df_a_csv(df_resultado)
-                st.download_button(
-                    "📥 Descargar CSV Completo con Validaciones",
-                    data=csv_validaciones,
-                    file_name="relacion_laboral_con_validaciones.csv",
-                    mime="text/csv",
-                    type="primary",
-                    use_container_width=True
-                )
+                link_csv_completo = crear_link_descarga(csv_validaciones, "relacion_laboral_con_validaciones.csv", "Descargar CSV Completo con Validaciones")
+                st.markdown(link_csv_completo, unsafe_allow_html=True)
                 
                 # Vista previa
                 st.write("### 👀 Vista Previa del Resultado")
@@ -731,14 +732,8 @@ def paso3_merge_adicional():
                                 
                                 # Descargar
                                 csv_merged = convertir_df_a_csv(df_merged)
-                                st.download_button(
-                                    "📥 Descargar Merge Simple",
-                                    data=csv_merged,
-                                    file_name="merge_ausentismos_filtrado.csv",
-                                    mime="text/csv",
-                                    type="primary",
-                                    use_container_width=True
-                                )
+                                link_merge_simple = crear_link_descarga(csv_merged, "merge_ausentismos_filtrado.csv", "Descargar Merge Simple")
+                                st.markdown(link_merge_simple, unsafe_allow_html=True)
                                 
                                 # Vista previa
                                 st.write("### 👀 Vista Previa")
@@ -783,14 +778,8 @@ def paso3_merge_adicional():
                                 
                                 # Descargar
                                 csv_super_merged = convertir_df_a_csv(df_merged)
-                                st.download_button(
-                                    "📥 Descargar Super Merge",
-                                    data=csv_super_merged,
-                                    file_name="super_merge_ausentismos.csv",
-                                    mime="text/csv",
-                                    type="primary",
-                                    use_container_width=True
-                                )
+                                link_super_merge = crear_link_descarga(csv_super_merged, "super_merge_ausentismos.csv", "Descargar Super Merge")
+                                st.markdown(link_super_merge, unsafe_allow_html=True)
                                 
                                 # Vista previa
                                 st.write("### 👀 Vista Previa")
@@ -832,26 +821,16 @@ def paso4_resumen_final():
     
     st.markdown("---")
     st.write("### 💾 Descarga Final")
+    st.write("**Haz clic en los botones verdes para descargar los archivos:**")
     
     if st.session_state.df_parte2 is not None:
         csv_final = convertir_df_a_csv(st.session_state.df_parte2)
-        st.download_button(
-            "📥 Descargar Archivo Final Completo (CSV)",
-            data=csv_final,
-            file_name="auditoria_ausentismos_final.csv",
-            mime="text/csv",
-            type="primary",
-            use_container_width=True
-        )
+        link_csv_final = crear_link_descarga(csv_final, "auditoria_ausentismos_final.csv", "Descargar Archivo Final (CSV)")
+        st.markdown(link_csv_final, unsafe_allow_html=True)
         
         excel_final = convertir_df_a_excel(st.session_state.df_parte2)
-        st.download_button(
-            "📥 Descargar Archivo Final Completo (Excel)",
-            data=excel_final,
-            file_name="auditoria_ausentismos_final.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True
-        )
+        link_excel_final = crear_link_descarga(excel_final, "auditoria_ausentismos_final.xlsx", "Descargar Archivo Final (Excel)")
+        st.markdown(link_excel_final, unsafe_allow_html=True)
     
     st.markdown("---")
     
