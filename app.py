@@ -315,27 +315,300 @@ def paso2():
 
 def paso3():
     header()
-    st.markdown("### 🏥 Paso 3: Scripts Adicionales (Opcional)")
+    st.markdown("### 🏥 Paso 3: Merge con Reporte 45 y CIE-10")
     
-    st.info("""
-    Este paso requiere usar scripts por separado:
-    - procesar_reporte_45.py
-    - merge_ausentismos.py
-    - merge_cie10.py
+    with st.expander("📋 ¿Qué hace este paso?", expanded=False):
+        st.markdown("**Entradas:** CSV Paso 2 + Reporte 45 (XLSX) + CIE-10 (XLSX)")
+        st.markdown("**Proceso:** Merge con Reporte 45 y tabla CIE-10")
+        st.markdown("**Salidas:** CSV con diagnósticos + ALERTA_DIAGNOSTICO.xlsx")
     
-    Consulta la documentación en README.md
-    """)
+    st.warning("🔴 Necesitas 3 archivos")
     
-    st.markdown("---")
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
+    
     with col1:
-        if st.button("⬅️ Volver al Paso 2", use_container_width=True):
-            st.session_state.paso_actual = 2
-            st.rerun()
+        st.info("📤 1. CSV del Paso 2")
+        csv_paso2 = st.file_uploader(
+            "relacion_laboral_con_validaciones.csv",
+            type=['csv'],
+            key="csv_p2"
+        )
+    
     with col2:
-        if st.button("✅ Finalizar", use_container_width=True, type="primary"):
-            st.session_state.paso_actual = 4
-            st.rerun()
+        st.info("📤 2. Reporte 45 (Excel)")
+        excel_reporte45 = st.file_uploader(
+            "Reporte 45_*.XLSX",
+            type=['xlsx', 'xls'],
+            key="excel_r45"
+        )
+    
+    with col3:
+        st.info("📤 3. CIE-10 (Excel)")
+        excel_cie10 = st.file_uploader(
+            "CIE 10 - AJUSTADO.xlsx",
+            type=['xlsx', 'xls'],
+            key="excel_cie10"
+        )
+    
+    if csv_paso2 and excel_reporte45 and excel_cie10:
+        try:
+            with st.spinner('⏳ Procesando merge con Reporte 45 y CIE-10...'):
+                # Leer CSV del paso 2
+                df_base = pd.read_csv(csv_paso2, encoding='utf-8-sig', dtype=str)
+                st.info(f"✅ CSV Paso 2: {len(df_base):,} registros")
+                
+                # Leer Reporte 45
+                df_reporte45 = pd.read_excel(excel_reporte45, dtype=str)
+                st.info(f"✅ Reporte 45: {len(df_reporte45):,} registros")
+                
+                # Filtrar Reporte 45 por tipos específicos
+                valores_filtro = [
+                    'Enf Gral SOAT', 'Inc. Accidente de Trabajo',
+                    'Inca. Enfer Gral Integral', 'Inca. Enfermedad  General',
+                    'Prorroga Enf Gral SOAT', 'Prorroga Inc. Accid. Trab',
+                    'Prorroga Inca/Enfer Gene', 'Incapa.fuera de turno'
+                ]
+                
+                # Buscar columna de texto de clase
+                col_txt_clase = None
+                for col in df_reporte45.columns:
+                    if 'txt' in col.lower() and 'pres' in col.lower():
+                        col_txt_clase = col
+                        break
+                
+                if col_txt_clase:
+                    df_reporte45_filtrado = df_reporte45[df_reporte45[col_txt_clase].isin(valores_filtro)].copy()
+                    st.info(f"✅ Reporte 45 filtrado: {len(df_reporte45_filtrado):,} registros")
+                else:
+                    df_reporte45_filtrado = df_reporte45.copy()
+                
+                # Filtrar CSV base también
+                if 'external_name_label' in df_base.columns:
+                    df_base_filtrado = df_base[df_base['external_name_label'].isin(valores_filtro)].copy()
+                    st.info(f"✅ CSV base filtrado: {len(df_base_filtrado):,} registros")
+                else:
+                    df_base_filtrado = df_base.copy()
+                
+                # Buscar columnas para merge en Reporte 45
+                col_num_pers_r45 = None
+                for col in df_reporte45_filtrado.columns:
+                    if 'número' in col.lower() and 'personal' in col.lower():
+                        col_num_pers_r45 = col
+                        break
+                
+                col_inicio_r45 = None
+                for col in df_reporte45_filtrado.columns:
+                    if 'inicio' in col.lower() and 'valid' in col.lower():
+                        col_inicio_r45 = col
+                        break
+                
+                col_fin_r45 = None
+                for col in df_reporte45_filtrado.columns:
+                    if 'fin' in col.lower() and 'valid' in col.lower():
+                        col_fin_r45 = col
+                        break
+                
+                col_clase_r45 = None
+                for col in df_reporte45_filtrado.columns:
+                    if 'clase' in col.lower() and 'absent' in col.lower():
+                        col_clase_r45 = col
+                        break
+                
+                if not all([col_num_pers_r45, col_inicio_r45, col_fin_r45, col_clase_r45]):
+                    st.error("❌ No se encontraron todas las columnas necesarias en Reporte 45")
+                    st.info(f"Columnas disponibles: {list(df_reporte45.columns)}")
+                else:
+                    # Crear llave en Reporte 45
+                    df_reporte45_filtrado['inicio_limpio'] = pd.to_datetime(df_reporte45_filtrado[col_inicio_r45], errors='coerce').dt.strftime('%d%m%Y')
+                    df_reporte45_filtrado['fin_limpio'] = pd.to_datetime(df_reporte45_filtrado[col_fin_r45], errors='coerce').dt.strftime('%d%m%Y')
+                    
+                    df_reporte45_filtrado['llave_report_45'] = (
+                        'K' +
+                        df_reporte45_filtrado[col_num_pers_r45].astype(str).str.strip() +
+                        df_reporte45_filtrado['inicio_limpio'].fillna('') +
+                        df_reporte45_filtrado['fin_limpio'].fillna('') +
+                        df_reporte45_filtrado[col_clase_r45].astype(str).str.strip()
+                    )
+                    
+                    # Merge INNER con Reporte 45
+                    df_merged = pd.merge(
+                        df_base_filtrado,
+                        df_reporte45_filtrado,
+                        left_on='llave',
+                        right_on='llave_report_45',
+                        how='inner',
+                        suffixes=('', '_r45')
+                    )
+                    
+                    st.success(f"✅ Merge con Reporte 45: {len(df_merged):,} registros con match")
+                    
+                    # VALIDACIÓN DE DIAGNÓSTICO
+                    st.markdown("### 🩺 Validando Diagnósticos")
+                    
+                    valores_requieren_diagnostico = [
+                        'Inca. Enfermedad  General', 'Prorroga Inca/Enfer Gene',
+                        'Inc. Accidente de Trabajo', 'Enf Gral SOAT', 'Prorroga Enf Gral SOAT',
+                        'Licencia Paternidad', 'Prorroga Inc. Accid. Trab', 'Incapacidad gral SENA',
+                        'Inca. Enfer Gral Integral', 'Licencia Paternidad Inegr', 'Licencia Maternidad',
+                        'Incap  mayor 180 dias', 'Incap  mayor 540 dias', 'Lic Mater Interrumpida',
+                        'Licencia Mater especial', 'Enf Gral Int SOAT', 'Inc. Enfer. General Hospi',
+                        'Prorr Inc/Enf Gral ntegra', 'Incapacidad ARL SENA', 'Licencia Maternidad Integ'
+                    ]
+                    
+                    # Buscar columna de diagnóstico en Reporte 45
+                    col_diagnostico = None
+                    for col in df_merged.columns:
+                        if 'descripc' in col.lower() and 'enfermedad' in col.lower():
+                            col_diagnostico = col
+                            break
+                    
+                    if col_diagnostico and 'external_name_label' in df_merged.columns:
+                        df_merged['alerta_diagnostico'] = df_merged.apply(
+                            lambda row: 'ALERTA DIAGNOSTICO' 
+                            if row['external_name_label'] in valores_requieren_diagnostico and 
+                               (pd.isna(row[col_diagnostico]) or str(row[col_diagnostico]).strip() in ['', 'nan', 'None'])
+                            else '', 
+                            axis=1
+                        )
+                        
+                        alertas_diag = (df_merged['alerta_diagnostico'] == 'ALERTA DIAGNOSTICO').sum()
+                        st.metric("🚨 Alertas de Diagnóstico", alertas_diag)
+                        
+                        df_alerta_diagnostico = df_merged[df_merged['alerta_diagnostico'] == 'ALERTA DIAGNOSTICO'].copy()
+                    else:
+                        st.warning("⚠️ No se pudo validar diagnósticos")
+                        df_alerta_diagnostico = pd.DataFrame()
+                    
+                    # MERGE CON CIE-10
+                    st.markdown("### 🏥 Agregando información CIE-10")
+                    
+                    df_cie10 = pd.read_excel(excel_cie10, dtype=str)
+                    st.info(f"✅ CIE-10: {len(df_cie10):,} códigos")
+                    
+                    # Buscar columnas en CIE-10
+                    col_codigo_cie = None
+                    for col in df_cie10.columns:
+                        if col.lower() in ['código', 'codigo', 'code']:
+                            col_codigo_cie = col
+                            break
+                    
+                    if col_codigo_cie and 'descripcion_general_external_code' in df_merged.columns:
+                        # Limpiar códigos
+                        df_merged['codigo_limpio'] = df_merged['descripcion_general_external_code'].str.strip().str.upper()
+                        df_cie10['codigo_limpio'] = df_cie10[col_codigo_cie].str.strip().str.upper()
+                        
+                        # Seleccionar columnas de CIE-10 a agregar
+                        cols_cie10 = [col_codigo_cie]
+                        if 'Descripción' in df_cie10.columns:
+                            cols_cie10.append('Descripción')
+                        if 'TIPO' in df_cie10.columns:
+                            cols_cie10.append('TIPO')
+                        
+                        cols_cie10.append('codigo_limpio')
+                        df_cie10_subset = df_cie10[cols_cie10].copy()
+                        
+                        # Merge con CIE-10
+                        df_final = pd.merge(
+                            df_merged,
+                            df_cie10_subset,
+                            on='codigo_limpio',
+                            how='left',
+                            suffixes=('', '_cie10')
+                        )
+                        
+                        # Renombrar columnas CIE-10
+                        renombrar = {}
+                        if col_codigo_cie in df_final.columns and col_codigo_cie != 'codigo_limpio':
+                            renombrar[col_codigo_cie] = 'cie10_codigo'
+                        if 'Descripción' in df_final.columns:
+                            renombrar['Descripción'] = 'cie10_descripcion'
+                        if 'TIPO' in df_final.columns:
+                            renombrar['TIPO'] = 'cie10_tipo'
+                        
+                        df_final = df_final.rename(columns=renombrar)
+                        
+                        # Eliminar columna temporal
+                        if 'codigo_limpio' in df_final.columns:
+                            df_final = df_final.drop(['codigo_limpio'], axis=1)
+                        
+                        con_cie10 = df_final['cie10_codigo'].notna().sum() if 'cie10_codigo' in df_final.columns else 0
+                        st.success(f"✅ Merge CIE-10: {con_cie10:,} registros con información")
+                    else:
+                        df_final = df_merged.copy()
+                        st.warning("⚠️ No se pudo hacer merge con CIE-10")
+            
+            st.success("✅ Proceso completado!")
+            
+            # Métricas finales
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("📊 Registros", f"{len(df_final):,}")
+            with col2:
+                alertas = (df_final['alerta_diagnostico'] == 'ALERTA DIAGNOSTICO').sum() if 'alerta_diagnostico' in df_final.columns else 0
+                st.metric("🚨 Alertas Diag", alertas)
+            with col3:
+                con_cie = df_final['cie10_codigo'].notna().sum() if 'cie10_codigo' in df_final.columns else 0
+                st.metric("🏥 Con CIE-10", con_cie)
+            with col4:
+                st.metric("📋 Columnas", len(df_final.columns))
+            
+            # Vista previa
+            st.markdown("### 👀 Vista Previa")
+            st.dataframe(df_final.head(10), use_container_width=True)
+            
+            # GENERAR ZIP
+            st.markdown("---")
+            st.markdown("### 📦 GENERAR ZIP CON TODO")
+            
+            archivos_zip = {
+                'ausentismos_con_cie10.csv': to_csv(df_final)
+            }
+            
+            # Agregar archivo de alertas de diagnóstico si hay
+            if len(df_alerta_diagnostico) > 0:
+                archivos_zip['ALERTA_DIAGNOSTICO.xlsx'] = to_excel(df_alerta_diagnostico)
+            
+            st.success(f"📦 ZIP contendrá {len(archivos_zip)} archivo(s)")
+            
+            for nombre in archivos_zip.keys():
+                st.markdown(f"- ✅ {nombre}")
+            
+            zip_data = crear_zip(archivos_zip)
+            
+            st.download_button(
+                label=f"📥 DESCARGAR ZIP - PASO 3 ({len(archivos_zip)} archivos)",
+                data=zip_data,
+                file_name="PASO_3_CIE10_y_Diagnosticos.zip",
+                mime="application/zip",
+                use_container_width=True,
+                type="primary"
+            )
+            
+            st.markdown("---")
+            if st.button("✅ Finalizar Proceso", use_container_width=True, type="primary"):
+                st.session_state.paso_actual = 4
+                st.rerun()
+                
+        except Exception as e:
+            st.error(f"❌ Error: {str(e)}")
+            with st.expander("Ver error completo"):
+                st.code(str(e))
+                import traceback
+                st.code(traceback.format_exc())
+    
+    else:
+        st.info("📤 Por favor sube los 3 archivos requeridos para continuar")
+        
+        st.markdown("---")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("⬅️ Volver al Paso 2", use_container_width=True):
+                st.session_state.paso_actual = 2
+                st.rerun()
+        with col2:
+            if st.button("⏭️ Saltar al Resumen", use_container_width=True):
+                st.session_state.paso_actual = 4
+                st.rerun()
 
 def paso4():
     header()
