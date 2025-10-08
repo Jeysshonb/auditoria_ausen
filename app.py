@@ -62,28 +62,32 @@ def paso1():
         try:
             with st.spinner('⏳ Procesando...'):
                 from auditoria_ausentismos_part1 import (
-                    TABLA_HOMOLOGACION, TABLA_VALIDADORES, TABLA_SUB_TIPO_FSE,
-                    COLUMNAS_REQUERIDAS, MAPEO_COLUMNAS, limpiar_fecha_para_llave
+                    tabla_homologacion,
+                    tabla_validadores, 
+                    tabla_sub_tipo_fse,
+                    columnas_requeridas,
+                    mapeo_columnas,
+                    limpiar_fecha_para_llave
                 )
                 
                 df = pd.read_csv(archivo, skiprows=2, encoding='utf-8', dtype=str)
-                columnas_encontradas = [col for col in COLUMNAS_REQUERIDAS if col in df.columns]
+                columnas_encontradas = [col for col in columnas_requeridas if col in df.columns]
                 df_especifico = df[columnas_encontradas].copy()
                 
                 df_especifico['Homologacion_clase_de_ausentismo_SSF_vs_SAP'] = \
-                    df_especifico['externalCode'].map(TABLA_HOMOLOGACION)
+                    df_especifico['externalCode'].map(tabla_homologacion)
                 
                 df_especifico['lastModifiedBy_limpio'] = df_especifico['lastModifiedBy'].astype(str).str.strip()
-                df_especifico['nombre_validador'] = df_especifico['lastModifiedBy_limpio'].map(TABLA_VALIDADORES)\
+                df_especifico['nombre_validador'] = df_especifico['lastModifiedBy_limpio'].map(tabla_validadores)\
                     .fillna('ALERTA VALIDADOR NO ENCONTRADO')
                 df_especifico = df_especifico.drop(['lastModifiedBy_limpio'], axis=1)
                 
                 df_especifico['Sub_tipo'] = df_especifico['Homologacion_clase_de_ausentismo_SSF_vs_SAP'].map(
-                    lambda x: TABLA_SUB_TIPO_FSE.get(str(x), {}).get('sub_tipo', 'ALERTA SUB_TIPO NO ENCONTRADO') 
+                    lambda x: tabla_sub_tipo_fse.get(str(x), {}).get('sub_tipo', 'ALERTA SUB_TIPO NO ENCONTRADO') 
                     if pd.notna(x) else 'ALERTA SUB_TIPO NO ENCONTRADO'
                 )
                 df_especifico['FSE'] = df_especifico['Homologacion_clase_de_ausentismo_SSF_vs_SAP'].map(
-                    lambda x: TABLA_SUB_TIPO_FSE.get(str(x), {}).get('fse', 'No Aplica') 
+                    lambda x: tabla_sub_tipo_fse.get(str(x), {}).get('fse', 'No Aplica') 
                     if pd.notna(x) else 'No Aplica'
                 )
                 
@@ -97,7 +101,7 @@ def paso1():
                 )
                 df_especifico = df_especifico.drop(['startDate_limpia', 'endDate_limpia'], axis=1)
                 
-                mapeo_actual = {col: MAPEO_COLUMNAS[col] for col in df_especifico.columns if col in MAPEO_COLUMNAS}
+                mapeo_actual = {col: mapeo_columnas[col] for col in df_especifico.columns if col in mapeo_columnas}
                 df_final = df_especifico.rename(columns=mapeo_actual)
                 
                 if 'numero_documento_identidad' in df_final.columns:
