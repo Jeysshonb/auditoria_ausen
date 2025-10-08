@@ -1,8 +1,158 @@
+### 🎯 Próximos Pasos Recomendados:
+    
+    1. **Revisa los archivos de alertas** - Corrige los errores identificados
+    2. **Documenta los resultados** - Mantén un registro de las auditorías
+    3. **Archiva los archivos** - Guarda los ZIPs para referencia futura
+    4. **Comunica hallazgos** - Comparte las alertas con los equipos correspondientes
+    
+    ---
+    
+    ### 📊 Estadísticas de tu Proceso:
+    """)
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.metric("Pasos Completados", "2 de 3", delta="Paso 3 opcional")
+    
+    with col2:
+        st.metric("Archivos Generados", "10+", delta="CSV y Excel")
+    
+    with col3:
+        st.metric("Estado", "Completo ✅")
+    
+    st.markdown("---")
+    
+    with st.expander("📚 Documentación y Soporte"):
+        st.markdown("""
+        **📖 Recursos disponibles:**
+        - README.md - Documentación completa
+        - GUIA_RAPIDA.md - Guía de inicio rápido
+        - Scripts en carpeta `scripts/` - Para procesos adicionales
+        
+        **🐛 Reportar problemas:**
+        - GitHub Issues: [Reportar bug](https://github.com/TU_USUARIO/auditoria-ausentismos/issues)
+        
+        **💬 Contacto:**
+        - Email: tu_email@ejemplo.com
+        """)
+    
+    st.markdown("---")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("🔄 Iniciar Nuevo Proceso", use_container_width=True, type="primary"):
+            st.session_state.paso_actual = 1
+            st.rerun()
+    
+    with col2:
+        if st.button("📊 Ver Estadísticas Detalladas", use_container_width=True):
+            st.info("Esta funcionalidad estará disponible próximamente")
+
+# ============================================================================
+# SIDEBAR
+# ============================================================================
+
+def sidebar():
+    with st.sidebar:
+        st.markdown("# 🧭 Navegación")
+        st.markdown("---")
+        
+        # Progreso
+        progreso = (st.session_state.paso_actual - 1) / 3 * 100
+        st.progress(progreso / 100)
+        st.markdown(f"**Progreso:** {progreso:.0f}%")
+        
+        st.markdown("---")
+        
+        # Pasos
+        pasos = [
+            ("1️⃣", "Procesamiento", 1, "✅"),
+            ("2️⃣", "Validaciones", 2, "✅"),
+            ("3️⃣", "Merge CIE-10", 3, "⭕"),
+            ("4️⃣", "Resumen", 4, "🎉")
+        ]
+        
+        for emoji, nombre, num, status in pasos:
+            if st.session_state.paso_actual == num:
+                st.markdown(f"**{emoji} {nombre}** ◄")
+            else:
+                if st.button(f"{emoji} {nombre}", key=f"nav_{num}", use_container_width=True):
+                    st.session_state.paso_actual = num
+                    st.rerun()
+            
+            # Mostrar estado
+            if num < st.session_state.paso_actual:
+                st.markdown(f"<small style='color: green;'>{status} Completado</small>", unsafe_allow_html=True)
+        
+        st.markdown("---")
+        
+        st.markdown("### 📝 Flujo del Proceso")
+        st.markdown("""
+        **Paso 1:**
+        - Sube CSV
+        - 📥 Descarga ZIP
+        
+        **Paso 2:**
+        - Sube CSV (Paso 1)
+        - Sube Excel (Personal)
+        - 📥 Descarga ZIP
+        
+        **Paso 3:**
+        - Opcional (scripts)
+        
+        **Paso 4:**
+        - ¡Listo! 🎉
+        """)
+        
+        st.markdown("---")
+        
+        # Info del sistema
+        st.markdown("### ℹ️ Sistema")
+        st.markdown("""
+        **Archivos temporales:** ❌ No  
+        **Almacenamiento:** ❌ No  
+        **Descargas:** ✅ ZIP  
+        
+        Tus archivos **NO** se guardan en el servidor. 
+        Todo se procesa en memoria y se descarga directamente.
+        """)
+        
+        st.markdown("---")
+        
+        # Versión
+        st.markdown("""
+        <div style="text-align: center; color: #666; font-size: 0.8rem;">
+            <p><strong>Auditoría Ausentismos</strong></p>
+            <p>v1.0.0</p>
+            <p>Juan José Bustos</p>
+            <p>Grupo Jerónimo Martins</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+# ============================================================================
+# MAIN
+# ============================================================================
+
+def main():
+    sidebar()
+    
+    if st.session_state.paso_actual == 1:
+        paso1()
+    elif st.session_state.paso_actual == 2:
+        paso2()
+    elif st.session_state.paso_actual == 3:
+        paso3()
+    elif st.session_state.paso_actual == 4:
+        paso4()
+
+if __name__ == "__main__":
+    main()
 import streamlit as st
 import pandas as pd
 from io import BytesIO
-import tempfile
-import os
+import zipfile
 
 # ============================================================================
 # CONFIGURACIÓN
@@ -25,6 +175,16 @@ st.markdown("""
     }
     .main-header h1 { color: white; margin: 0; font-size: 2.5rem; }
     .main-header p { color: #e8f5e9; margin: 0.5rem 0 0 0; }
+    .big-download {
+        background: #4CAF50;
+        color: white;
+        padding: 1.5rem;
+        border-radius: 10px;
+        text-align: center;
+        margin: 2rem 0;
+        font-size: 1.2rem;
+        font-weight: bold;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -43,36 +203,53 @@ def header():
     st.markdown("""
     <div class="main-header">
         <h1>📊 Auditoría de Ausentismos</h1>
-        <p>Sistema Paso a Paso con Descargas</p>
+        <p>Sistema Paso a Paso - Descarga → Sube → Descarga</p>
     </div>
     """, unsafe_allow_html=True)
 
 def to_excel(df):
+    """Convierte DataFrame a Excel en memoria"""
     output = BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, index=False)
     return output.getvalue()
 
 def to_csv(df):
+    """Convierte DataFrame a CSV en memoria"""
     return df.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
 
+def crear_zip(archivos_dict):
+    """
+    Crea un ZIP en memoria con múltiples archivos
+    archivos_dict = {'nombre_archivo.csv': bytes_data, ...}
+    """
+    zip_buffer = BytesIO()
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        for nombre, data in archivos_dict.items():
+            zip_file.writestr(nombre, data)
+    return zip_buffer.getvalue()
+
 # ============================================================================
-# PASO 1: PROCESA CSV Y DESCARGA
+# PASO 1: PROCESA CSV Y GENERA ZIP
 # ============================================================================
 
 def paso1():
     header()
     st.markdown("### 🔄 Paso 1: Procesamiento Inicial")
     
-    with st.expander("📋 ¿Qué hace este paso?"):
+    with st.expander("📋 ¿Qué hace este paso?", expanded=False):
         st.markdown("""
-        **Script:** `auditoria_ausentismos_part1.py`
-        
         **Entrada:**
         - CSV de ausentismos (AusentismoCOL-ApprovedPayroll...)
         
-        **Salida:**
-        - ✅ `ausentismo_procesado_especifico.csv` (para usar en Paso 2)
+        **Proceso:**
+        - Ejecuta lógica de `auditoria_ausentismos_part1.py`
+        - Homologación SSF vs SAP
+        - Mapea validadores
+        - Crea llaves únicas
+        
+        **Salida (ZIP):**
+        - ✅ `ausentismo_procesado_especifico.csv` → **Úsalo en Paso 2**
         """)
     
     st.info("📤 Sube el archivo CSV de ausentismos")
@@ -81,14 +258,14 @@ def paso1():
     
     if archivo:
         try:
-            with st.spinner('⏳ Procesando con part1.py...'):
-                # IMPORTAR PART1
+            with st.spinner('⏳ Procesando archivo...'):
+                # IMPORTAR LÓGICA DE PART1
                 from auditoria_ausentismos_part1 import (
                     TABLA_HOMOLOGACION, TABLA_VALIDADORES, TABLA_SUB_TIPO_FSE,
                     COLUMNAS_REQUERIDAS, MAPEO_COLUMNAS, limpiar_fecha_para_llave
                 )
                 
-                # EJECUTAR LÓGICA DE PART1
+                # EJECUTAR PROCESAMIENTO
                 df = pd.read_csv(archivo, skiprows=2, encoding='utf-8', dtype=str)
                 
                 columnas_encontradas = [col for col in COLUMNAS_REQUERIDAS if col in df.columns]
@@ -140,7 +317,7 @@ def paso1():
             st.success("✅ Procesamiento completado!")
             
             # Métricas
-            col1, col2, col3 = st.columns(3)
+            col1, col2, col3, col4 = st.columns(4)
             with col1:
                 st.metric("📊 Registros", f"{len(df_final):,}")
             with col2:
@@ -148,25 +325,47 @@ def paso1():
             with col3:
                 alertas = (df_final['nombre_validador'] == 'ALERTA VALIDADOR NO ENCONTRADO').sum()
                 st.metric("⚠️ Alertas", alertas)
+            with col4:
+                st.metric("🔑 Llaves Únicas", df_final['llave'].nunique())
             
             # Vista previa
             st.markdown("### 👀 Vista Previa")
-            st.dataframe(df_final.head(10), use_container_width=True)
+            st.dataframe(df_final.head(10), use_container_width=True, height=300)
             
-            # DESCARGA
+            # GENERAR ZIP
             st.markdown("---")
-            st.markdown("### 💾 DESCARGA para continuar al Paso 2")
-            csv_data = to_csv(df_final)
-            st.download_button(
-                label="📥 DESCARGAR: ausentismo_procesado_especifico.csv",
-                data=csv_data,
-                file_name="ausentismo_procesado_especifico.csv",
-                mime="text/csv",
-                use_container_width=True,
-                type="primary"
-            )
+            st.markdown('<div class="big-download">📦 DESCARGA TODO EN UN ZIP</div>', unsafe_allow_html=True)
             
-            st.info("👉 **Paso siguiente:** Descarga este archivo y úsalo en el Paso 2")
+            # Preparar archivos para ZIP
+            archivos_zip = {
+                'ausentismo_procesado_especifico.csv': to_csv(df_final)
+            }
+            
+            zip_data = crear_zip(archivos_zip)
+            
+            col1, col2 = st.columns([2, 1])
+            
+            with col1:
+                st.download_button(
+                    label="📥 DESCARGAR ZIP - PASO 1 (ausentismo_procesado_especifico.csv)",
+                    data=zip_data,
+                    file_name="PASO_1_Archivos_Procesados.zip",
+                    mime="application/zip",
+                    use_container_width=True,
+                    type="primary"
+                )
+            
+            with col2:
+                # También opción individual
+                st.download_button(
+                    label="📄 Solo CSV",
+                    data=to_csv(df_final),
+                    file_name="ausentismo_procesado_especifico.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
+            
+            st.success("👉 **Siguiente:** Descarga el ZIP, extrae el CSV y úsalo en el Paso 2")
             
             # Botón siguiente
             st.markdown("---")
@@ -176,59 +375,67 @@ def paso1():
                 
         except Exception as e:
             st.error(f"❌ Error: {str(e)}")
+            with st.expander("Ver error completo"):
+                st.code(str(e))
 
 # ============================================================================
-# PASO 2: SUBE CSV DE PASO 1 + EXCEL PERSONAL, DESCARGA VALIDACIONES
+# PASO 2: SUBE CSV PASO 1 + EXCEL, GENERA ZIP CON TODO
 # ============================================================================
 
 def paso2():
     header()
     st.markdown("### 🔗 Paso 2: Validaciones y Merge")
     
-    with st.expander("📋 ¿Qué hace este paso?"):
+    with st.expander("📋 ¿Qué hace este paso?", expanded=False):
         st.markdown("""
-        **Script:** `auditoria_ausentismos_part2.py`
-        
         **Entradas:**
         - ✅ `ausentismo_procesado_especifico.csv` (del Paso 1)
-        - ✅ `MD_*.XLSX` (archivo de personal)
+        - ✅ `MD_*.XLSX` (archivo de personal/relación laboral)
         
-        **Salidas:**
-        - ✅ `relacion_laboral_con_validaciones.csv` (para usar en Paso 3)
+        **Proceso:**
+        - Ejecuta lógica de `auditoria_ausentismos_part2.py`
+        - Merge con relación laboral
+        - Validaciones SENA y Ley 50
+        - Genera 6 columnas de validación
+        - Crea archivos de alertas
+        
+        **Salida (ZIP):**
+        - ✅ `relacion_laboral_con_validaciones.csv` → **Úsalo en Paso 3**
         - ✅ 9+ archivos Excel de alertas (Sena_error, Ley_50_error, etc.)
         """)
     
-    st.warning("🔴 **IMPORTANTE:** Necesitas el archivo CSV generado en el Paso 1")
+    st.warning("🔴 **IMPORTANTE:** Necesitas 2 archivos")
     
     col1, col2 = st.columns(2)
     
     with col1:
-        st.info("📤 1. Sube el CSV del Paso 1")
+        st.info("📤 1. CSV del Paso 1")
         csv_paso1 = st.file_uploader(
             "ausentismo_procesado_especifico.csv",
             type=['csv'],
-            key="csv_paso1"
+            key="csv_p1",
+            help="El archivo que descargaste en el Paso 1"
         )
     
     with col2:
-        st.info("📤 2. Sube el Excel de Personal")
+        st.info("📤 2. Excel de Personal")
         excel_personal = st.file_uploader(
             "MD_*.XLSX",
             type=['xlsx', 'xls'],
-            key="excel_personal"
+            key="excel_pers",
+            help="Archivo maestro de datos de personal"
         )
     
     if csv_paso1 and excel_personal:
         try:
-            with st.spinner('⏳ Procesando con part2.py... (Esto puede tardar)'):
+            with st.spinner('⏳ Procesando validaciones... (puede tardar unos minutos)'):
                 # Leer archivos
                 df_ausentismo = pd.read_csv(csv_paso1, encoding='utf-8-sig')
                 df_personal = pd.read_excel(excel_personal)
                 
-                st.success(f"✅ CSV leído: {len(df_ausentismo):,} registros")
-                st.success(f"✅ Excel leído: {len(df_personal):,} registros")
+                st.info(f"✅ CSV: {len(df_ausentismo):,} registros | Excel: {len(df_personal):,} registros")
                 
-                # Buscar columnas
+                # Buscar columnas de personal
                 col_num_pers = None
                 for col in df_personal.columns:
                     if 'pers' in col.lower() or 'personal' in col.lower():
@@ -243,6 +450,7 @@ def paso2():
                 
                 if not col_num_pers or not col_relacion:
                     st.error("❌ No se encontraron columnas necesarias en el Excel")
+                    st.info(f"Columnas disponibles: {list(df_personal.columns)}")
                     st.stop()
                 
                 # Merge
@@ -276,7 +484,7 @@ def paso2():
                                         'Inca. Enfer Gral Integral', 'Prorr Inc/Enf Gral ntegra']
                 df_errores_ley50 = df_ley50[df_ley50['external_name_label'].isin(conceptos_prohibidos)].copy()
                 
-                # Crear columnas validación
+                # Crear columnas de validación
                 df['licencia_paternidad'] = df.apply(
                     lambda r: "Concepto Si Aplica" if r['external_name_label'] == "Licencia Paternidad" and r['calendar_days'] == '14' else "Concepto No Aplica", axis=1)
                 df['licencia_maternidad'] = df.apply(
@@ -293,71 +501,118 @@ def paso2():
             st.success("✅ Validaciones completadas!")
             
             # Métricas
-            col1, col2, col3 = st.columns(3)
+            col1, col2, col3, col4 = st.columns(4)
             with col1:
                 st.metric("📊 Registros", f"{len(df):,}")
             with col2:
                 st.metric("🚨 Errores SENA", len(df_errores_sena))
             with col3:
                 st.metric("🚨 Errores Ley 50", len(df_errores_ley50))
+            with col4:
+                total_alertas = len(df_errores_sena) + len(df_errores_ley50)
+                st.metric("📋 Total Alertas", total_alertas)
             
-            # DESCARGAS
+            # Vista previa
+            st.markdown("### 👀 Vista Previa del Resultado")
+            st.dataframe(df.head(10), use_container_width=True, height=300)
+            
+            # PREPARAR ARCHIVOS PARA ZIP
             st.markdown("---")
-            st.markdown("### 💾 DESCARGAS")
+            st.markdown('<div class="big-download">📦 DESCARGA TODO EN UN ZIP</div>', unsafe_allow_html=True)
             
-            # Archivo principal
-            st.markdown("#### 📄 Archivo Principal (para Paso 3)")
-            csv_main = to_csv(df)
+            archivos_zip = {
+                'relacion_laboral_con_validaciones.csv': to_csv(df)
+            }
+            
+            # Agregar archivos de alertas al ZIP
+            alertas_generadas = []
+            
+            if len(df_errores_sena) > 0:
+                archivos_zip['Sena_error_validar.xlsx'] = to_excel(df_errores_sena)
+                alertas_generadas.append(('Sena_error_validar.xlsx', len(df_errores_sena)))
+            
+            if len(df_errores_ley50) > 0:
+                archivos_zip['Ley_50_error_validar.xlsx'] = to_excel(df_errores_ley50)
+                alertas_generadas.append(('Ley_50_error_validar.xlsx', len(df_errores_ley50)))
+            
+            # Otras alertas
+            df_alert_pat = df[(df['licencia_paternidad'] == 'Concepto No Aplica') & (df['external_name_label'] == 'Licencia Paternidad')]
+            if len(df_alert_pat) > 0:
+                archivos_zip['alerta_licencia_paternidad.xlsx'] = to_excel(df_alert_pat)
+                alertas_generadas.append(('alerta_licencia_paternidad.xlsx', len(df_alert_pat)))
+            
+            df_alert_mat = df[(df['licencia_maternidad'] == 'Concepto No Aplica') & (df['external_name_label'] == 'Licencia Maternidad')]
+            if len(df_alert_mat) > 0:
+                archivos_zip['alerta_licencia_maternidad.xlsx'] = to_excel(df_alert_mat)
+                alertas_generadas.append(('alerta_licencia_maternidad.xlsx', len(df_alert_mat)))
+            
+            df_alert_luto = df[(df['ley_de_luto'] == 'Concepto No Aplica') & (df['external_name_label'] == 'Ley de luto')]
+            if len(df_alert_luto) > 0:
+                archivos_zip['alerta_ley_de_luto.xlsx'] = to_excel(df_alert_luto)
+                alertas_generadas.append(('alerta_ley_de_luto.xlsx', len(df_alert_luto)))
+            
+            df_alert_incap = df[(df['incap_fuera_de_turno'] == 'Concepto No Aplica') & (df['external_name_label'] == 'Incapa.fuera de turno')]
+            if len(df_alert_incap) > 0:
+                archivos_zip['alerta_incap_fuera_de_turno.xlsx'] = to_excel(df_alert_incap)
+                alertas_generadas.append(('alerta_incap_fuera_de_turno.xlsx', len(df_alert_incap)))
+            
+            # Incapacidades > 30 días
+            conceptos_incap = ['Incapacidad enfermedad general', 'Prorroga Inca/Enfer Gene',
+                               'Enf Gral SOAT', 'Inc. Accidente de Trabajo', 'Prorroga Inc. Accid. Trab']
+            df_incap30 = df[(df['external_name_label'].isin(conceptos_incap)) & 
+                            (pd.to_numeric(df['calendar_days'], errors='coerce') > 30)]
+            if len(df_incap30) > 0:
+                archivos_zip['incp_mayor_30_dias.xlsx'] = to_excel(df_incap30)
+                alertas_generadas.append(('incp_mayor_30_dias.xlsx', len(df_incap30)))
+            
+            # Día de familia > 1
+            df_dia_fam = df[(df['external_name_label'] == 'Día de la familia') & 
+                            (pd.to_numeric(df['calendar_days'], errors='coerce') > 1)]
+            if len(df_dia_fam) > 0:
+                archivos_zip['dia_de_la_familia.xlsx'] = to_excel(df_dia_fam)
+                alertas_generadas.append(('dia_de_la_familia.xlsx', len(df_dia_fam)))
+            
+            # Ausentismos sin pago > 10 días
+            conceptos_sin_pago = ['Aus Reg sin Soporte', 'Suspensión']
+            df_sin_pago = df[(df['external_name_label'].isin(conceptos_sin_pago)) & 
+                             (pd.to_numeric(df['calendar_days'], errors='coerce') > 10)]
+            if len(df_sin_pago) > 0:
+                archivos_zip['Validacion_ausentismos_sin_pago_mayor_10_dias.xlsx'] = to_excel(df_sin_pago)
+                alertas_generadas.append(('Validacion_ausentismos_sin_pago_mayor_10_dias.xlsx', len(df_sin_pago)))
+            
+            # Mostrar archivos que se incluirán
+            st.success(f"📦 El ZIP contiene **{len(archivos_zip)} archivo(s)**:")
+            
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                st.markdown("**Archivo principal:**")
+                st.markdown("- ✅ `relacion_laboral_con_validaciones.csv`")
+                
+                if alertas_generadas:
+                    st.markdown(f"\n**Archivos de alertas ({len(alertas_generadas)}):**")
+                    for nombre, cantidad in alertas_generadas:
+                        st.markdown(f"- 🚨 `{nombre}` ({cantidad} registros)")
+                else:
+                    st.success("- ✅ No hay alertas")
+            
+            with col2:
+                st.metric("Total archivos", len(archivos_zip))
+            
+            # GENERAR Y DESCARGAR ZIP
+            zip_data = crear_zip(archivos_zip)
+            
             st.download_button(
-                "📥 DESCARGAR: relacion_laboral_con_validaciones.csv",
-                csv_main,
-                "relacion_laboral_con_validaciones.csv",
-                "text/csv",
+                label=f"📥 DESCARGAR ZIP - PASO 2 ({len(archivos_zip)} archivos)",
+                data=zip_data,
+                file_name="PASO_2_Validaciones_y_Alertas.zip",
+                mime="application/zip",
                 use_container_width=True,
                 type="primary"
             )
             
-            # Archivos de alertas
-            st.markdown("#### 🚨 Archivos de Alertas")
+            st.success("👉 **Siguiente:** Si necesitas merge con Reporte 45 o CIE-10, ve al Paso 3. Sino, ¡ya terminaste!")
             
-            alertas = []
-            if len(df_errores_sena) > 0:
-                alertas.append(('Sena_error_validar.xlsx', df_errores_sena))
-            if len(df_errores_ley50) > 0:
-                alertas.append(('Ley_50_error_validar.xlsx', df_errores_ley50))
-            
-            # Otras alertas (simplificado)
-            df_alert_pat = df[(df['licencia_paternidad'] == 'Concepto No Aplica') & (df['external_name_label'] == 'Licencia Paternidad')]
-            if len(df_alert_pat) > 0:
-                alertas.append(('alerta_licencia_paternidad.xlsx', df_alert_pat))
-            
-            df_alert_mat = df[(df['licencia_maternidad'] == 'Concepto No Aplica') & (df['external_name_label'] == 'Licencia Maternidad')]
-            if len(df_alert_mat) > 0:
-                alertas.append(('alerta_licencia_maternidad.xlsx', df_alert_mat))
-            
-            if alertas:
-                cols = st.columns(2)
-                for i, (nombre, df_alert) in enumerate(alertas):
-                    with cols[i % 2]:
-                        excel_data = to_excel(df_alert)
-                        st.download_button(
-                            f"📥 {nombre} ({len(df_alert)})",
-                            excel_data,
-                            nombre,
-                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                            key=f"alert_{i}",
-                            use_container_width=True
-                        )
-            else:
-                st.success("✅ No hay alertas - Todo correcto")
-            
-            # Vista previa
-            st.markdown("### 👀 Vista Previa")
-            st.dataframe(df.head(10), use_container_width=True)
-            
-            st.info("👉 **Paso siguiente:** Descarga el CSV principal para usar en Paso 3 (opcional)")
-            
-            # Botón siguiente
+            # Botones navegación
             st.markdown("---")
             col1, col2 = st.columns(2)
             with col1:
@@ -365,7 +620,7 @@ def paso2():
                     st.session_state.paso_actual = 3
                     st.rerun()
             with col2:
-                if st.button("✅ Finalizar Aquí", use_container_width=True):
+                if st.button("✅ Finalizar Aquí", use_container_width=True, type="primary"):
                     st.session_state.paso_actual = 4
                     st.rerun()
                 
@@ -373,35 +628,46 @@ def paso2():
             st.error(f"❌ Error: {str(e)}")
             with st.expander("Ver error completo"):
                 st.code(str(e))
+                import traceback
+                st.code(traceback.format_exc())
 
 # ============================================================================
-# PASO 3: MERGE CON CIE-10 (OPCIONAL)
+# PASO 3: INFO PARA SCRIPTS ADICIONALES
 # ============================================================================
 
 def paso3():
     header()
-    st.markdown("### 🏥 Paso 3: Merge con CIE-10 (Opcional)")
-    
-    with st.expander("📋 ¿Qué hace este paso?"):
-        st.markdown("""
-        **Script:** `auditoria_ausentismos_part3.py` o scripts de merge
-        
-        **Entradas:**
-        - ✅ CSV del Paso 2 (o merged con Reporte 45)
-        - ✅ `CIE 10 - AJUSTADO - NÓMINA.xlsx`
-        
-        **Salida:**
-        - ✅ `ausentismos_con_cie10.csv` (archivo final con diagnósticos)
-        """)
+    st.markdown("### 🏥 Paso 3: Merge con Reporte 45 y CIE-10 (Opcional)")
     
     st.info("""
-    📝 **Nota:** Este paso requiere scripts adicionales para:
-    1. Procesar Reporte 45 (opcional)
-    2. Hacer merge con Reporte 45 (opcional)
-    3. Merge con CIE-10
+    📝 **Este paso requiere usar scripts adicionales por separado:**
     
-    Usa los scripts en la carpeta `scripts/` para estos procesos.
+    Los archivos `part3.py` y scripts de merge están diseñados para ejecutarse 
+    desde línea de comandos con rutas fijas.
+    
+    **Para completar este paso:**
+    
+    1. Usa el script `procesar_reporte_45.py` para procesar el Reporte 45
+    2. Usa el script `merge_ausentismos.py` para hacer merge
+    3. Usa el script `merge_cie10.py` para agregar información CIE-10
+    
+    **Consulta la documentación en README.md para más detalles.**
     """)
+    
+    with st.expander("📚 Ver rutas de los scripts"):
+        st.code("""
+# Scripts disponibles en la carpeta scripts/:
+
+scripts/
+├── procesar_reporte_45.py    # Procesa Reporte 45 de SAP
+├── merge_ausentismos.py       # Merge con Reporte 45
+└── merge_cie10.py             # Agrega información CIE-10
+
+# Ejecutar desde terminal:
+python scripts/procesar_reporte_45.py
+python scripts/merge_ausentismos.py
+python scripts/merge_cie10.py
+        """)
     
     st.markdown("---")
     col1, col2 = st.columns(2)
@@ -424,86 +690,25 @@ def paso4():
     
     st.balloons()
     
-    st.success("✅ ¡Felicitaciones! Has completado el proceso de auditoría")
+    st.success("✅ ¡Felicitaciones! Has completado el proceso de auditoría de ausentismos")
     
     st.markdown("""
-    ### 📋 Resumen
+    ### 📋 Resumen de Archivos Generados
     
-    Has generado los siguientes archivos:
-    
-    **Paso 1:**
+    **📦 Paso 1:**
     - ✅ `ausentismo_procesado_especifico.csv`
     
-    **Paso 2:**
+    **📦 Paso 2:**
     - ✅ `relacion_laboral_con_validaciones.csv`
-    - ✅ Archivos de alertas (Excel)
+    - ✅ Archivos Excel de alertas (Sena_error, Ley_50_error, etc.)
     
-    **Paso 3 (Opcional):**
-    - ⭕ Merge con Reporte 45 y CIE-10
-    """)
+    **📦 Paso 3 (Opcional):**
+    - ⭕ Merge con Reporte 45
+    - ⭕ Información CIE-10
     
-    st.markdown("---")
+    ---
     
-    if st.button("🔄 Iniciar Nuevo Proceso", use_container_width=True, type="primary"):
-        st.session_state.paso_actual = 1
-        st.rerun()
-
-# ============================================================================
-# SIDEBAR
-# ============================================================================
-
-def sidebar():
-    with st.sidebar:
-        st.markdown("# 🧭 Navegación")
-        st.markdown("---")
-        
-        # Progreso
-        progreso = (st.session_state.paso_actual - 1) / 3 * 100
-        st.progress(progreso / 100)
-        st.markdown(f"**Progreso:** {progreso:.0f}%")
-        
-        st.markdown("---")
-        
-        # Pasos
-        pasos = [
-            ("1️⃣", "Procesamiento", 1),
-            ("2️⃣", "Validaciones", 2),
-            ("3️⃣", "Merge CIE-10 (Opcional)", 3),
-            ("4️⃣", "Resumen", 4)
-        ]
-        
-        for emoji, nombre, num in pasos:
-            if st.session_state.paso_actual == num:
-                st.markdown(f"**{emoji} {nombre}** ◄")
-            else:
-                if st.button(f"{emoji} {nombre}", key=f"nav_{num}", use_container_width=True):
-                    st.session_state.paso_actual = num
-                    st.rerun()
-        
-        st.markdown("---")
-        st.markdown("""
-        ### 📝 Flujo
-        1. Sube CSV → Descarga
-        2. Sube CSV+Excel → Descarga
-        3. (Opcional) Merge CIE-10
-        4. ¡Listo!
-        """)
-
-# ============================================================================
-# MAIN
-# ============================================================================
-
-def main():
-    sidebar()
+    ### 🎯 Próximos Pasos Recomendados:
     
-    if st.session_state.paso_actual == 1:
-        paso1()
-    elif st.session_state.paso_actual == 2:
-        paso2()
-    elif st.session_state.paso_actual == 3:
-        paso3()
-    elif st.session_state.paso_actual == 4:
-        paso4()
-
-if __name__ == "__main__":
-    main()
+    1. **Revisa los archivos de alertas** - Corrige los errores identificados
+    2. **Documenta los resultados** - Mantén un registro de las au
