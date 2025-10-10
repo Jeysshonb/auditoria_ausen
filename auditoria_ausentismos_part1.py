@@ -1,15 +1,20 @@
-# Auditoría Ausentismos - Con Columna Nombre Validador
+# Auditoría Ausentismos - Versión Completa con CONCAT y Validaciones Mejoradas
 import pandas as pd
 import os
 
-# Rutas de archivos
-ruta_entrada = r"C:\Users\jjbustos\OneDrive - Grupo Jerónimo Martins\Documents\auditoria ausentismos\archivos_planos\AusentismoCOL-ApprovedPayrollIndicarfecha-Componente1.csv"
+# ============================================================================
+# RUTAS DE ARCHIVOS
+# ============================================================================
+ruta_entrada_csv = r"C:\Users\jjbustos\OneDrive - Grupo Jerónimo Martins\Documents\auditoria ausentismos\archivos_planos\AusentismoCOL-ApprovedPayrollIndicarfecha-Componente1.csv"
+ruta_entrada_excel = r"C:\Users\jjbustos\OneDrive - Grupo Jerónimo Martins\Documents\auditoria ausentismos\archivos_planos\Reporte 45_012025_082025_26082025.XLSX"
 directorio_salida = r"C:\Users\jjbustos\OneDrive - Grupo Jerónimo Martins\Documents\auditoria ausentismos\archivos_salida"
-archivo_salida = "ausentismo_procesado_especifico.csv"
+archivo_salida = "ausentismo_procesado_completo_v2.csv"
 ruta_completa_salida = os.path.join(directorio_salida, archivo_salida)
 
-# Columnas que necesitas (22 columnas específicas)
-columnas_requeridas = [
+# ============================================================================
+# COLUMNAS REQUERIDAS DEL CSV
+# ============================================================================
+columnas_csv = [
     'ID personal',
     'Nombre completo',
     'Cod Función (externalCode)',
@@ -34,38 +39,9 @@ columnas_requeridas = [
     'approvalStatus'
 ]
 
-# Mapeo a snake_case (ahora incluye nombre_validador, sub_tipo y fse)
-mapeo_columnas = {
-    'ID personal': 'id_personal',
-    'Nombre completo': 'nombre_completo',
-    'Cod Función (externalCode)': 'cod_funcion_external_code',
-    'Cod Función (Label)': 'cod_funcion_label',
-    'Tipo de Documento de Identidad': 'tipo_documento_identidad',
-    'Número de Documento de Identidad': 'numero_documento_identidad',
-    'Estado de empleado (Picklist Label)': 'estado_empleado_picklist_label',
-    'externalCode': 'external_code',
-    'externalName (Label)': 'external_name_label',
-    'startDate': 'start_date',
-    'endDate': 'end_date',
-    'quantityInDays': 'quantity_in_days',
-    'Calendar Days': 'calendar_days',
-    'Descripción General (External Code)': 'descripcion_general_external_code',
-    'Descripción General (Picklist Label)': 'descripcion_general_picklist_label',
-    'Fecha de inicio de ausentismo': 'fecha_inicio_ausentismo',
-    'Agregador global de ausencias (Picklist Label)': 'agregador_global_ausencias_picklist_label',
-    'lastModifiedBy': 'last_modified_by',
-    'Last Approval Status Date': 'last_approval_status_date',
-    'HR Personnel Subarea': 'hr_personnel_subarea',
-    'HR Personnel Subarea Name': 'hr_personnel_subarea_name',
-    'approvalStatus': 'approval_status',
-    'Homologacion_clase_de_ausentismo_SSF_vs_SAP': 'homologacion_clase_de_ausentismo_ssf_vs_sap',
-    'llave': 'llave',
-    'nombre_validador': 'nombre_validador',
-    'Sub_tipo': 'sub_tipo',
-    'FSE': 'fse'
-}
-
-# Tabla de homologación SSF vs SAP - COMPLETA
+# ============================================================================
+# TABLA DE HOMOLOGACIÓN SSF vs SAP (MAPEO DIRECTO)
+# ============================================================================
 tabla_homologacion = {
     'CO_vacatio': '100',
     'CO_SICK180': '188',
@@ -113,77 +89,121 @@ tabla_homologacion = {
     'CO_VOTING': '345',
     'CO_INT_UNP': '196',
     'CO_FAM_FDS': '205',
-    'CO_VacationsFDS': '100'
+    'CO_VacationsFDS': '100',
+    'Aus.Sin Soporte Rech Docs': '399'
+    
+
 }
 
-# NUEVA TABLA: Mapeo de códigos de aprobador a nombres
+# TABLA INVERSA: De código SAP (205) a código SSF (CO_FAMILY)
+tabla_homologacion_inversa = {v: k for k, v in tabla_homologacion.items()}
+
+# ============================================================================
+# TABLA DE VALIDADORES ACTUALIZADA (CON AMBAS COLUMNAS)
+# Incluye mapeo INVERSO por nombre de usuario también
+# ============================================================================
 tabla_validadores = {
-    '80002749': 'Diana Paola Martinez Diaz',
-    '62208433': 'Nini Johanna Neira',
-    '62208420': 'Maria Lorena Ospina',
-    '62208383': 'Juan Sebastian Sanabria Cabezas',
-    '62208367': 'Yeimy Velasco',
-    '60005132': 'Angie Paola Muñoz',
-    '80025780': 'Buitrago Baron Deisy Marley',
-    '80005980': 'Caro Salamanca Wilson Alfredo',
-    '80003719': 'Carreño Diaz Natalia Andrea',
-    '60005117': 'Daniela Maria Herrera',
-    '80022209': 'Guerra Cabrera Carolina',
-    '80025779': 'Huerfano Davila Edgar Andres',
-    '60005052': 'Jose Esteban Vargas',
-    '60006940': 'Juan Esteban Sanabria',
-    '60005371': 'Lenin Karina Triana',
-    '60005046': 'Luis Armando Chacon',
-    '60005129': 'Luz Liliana Rodriguez',
-    '60006593': 'Luz Liliana Rodriguez',
-    '60006112': 'Mancera Reinosa Diana Maria',
-    '60006909': 'Maria Jose Alfonso',
-    '60005057': 'Maria Lorena Ospina',
-    '80000523': 'Rodriguez Gutierrez Paula Marcela',
-    '80025781': 'Yaima Motta Alejandra Lorena',
-    '60006707': 'Yeimy Velasco',
-    '62212713': 'Andres Castaño',
-    '62212735': 'Diana Shirley Quiroga Cubillos',
-    '62214358': 'Paula Estefania Cardenas Diaz',
-    '62214530': 'Ana Milena Moyano Beltran',
-    '62212720': 'Lenin Karina Triana',
-    '62215253': 'Angie Marcela Carranza Arbelaez',
-    '62219343': 'Johan Esteven Bernal Diaz',
-    '62219327': 'Karen Ximena Castañeda Cristancho',
-    '62220971': 'Paula Estefania Cardenas Diaz',
-    '62222408': 'Julieth Lorena Pacheco Vargas',
-    '62214888': 'Liliana Espitia',
-    '62222738': 'Diana Shirley Quiroga Cubillos',
-    '62231004': 'Dayana Ramirez',
-    '62230354': 'Karen Ximena Castañeda Cristancho',
-    '62237396': 'Johan Esteven Bernal Diaz',
-    '62237293': 'Douglas Enrique Mora',
-    '62243896': 'Maria Alejandra Preciado',
-    '62246490': 'Norberto Alvarez',
-    '62252653': 'Hasbleidy Vanessa Rodriguez Beltran',
-    '62256597': 'Wilson Arley Perez',
-    '62259813': 'Ramiro Augusto Chavez',
-    '80024790': 'Heidy Maiyeth Alvarez',
-    '62256596': 'Alexander Parga',
-    '62261836': 'Sandra Milena Pinzon',
-    '62261839': 'Andrea Gissette Turizo',
-    '62266296': 'Nicol Estefani Porras',
-    '62273220': 'Erika Daniela Amaya Varela',
-    '62274136': 'Yuri Viviana Torres Garcia',
-    '62274134': 'Yeraldin Iveth Correa Mateus',
-    '62278611': 'Cesar Augusto Pinzon Calderon',
-    '62277236': 'Cristian Alexander Rodriguez Contreras',
-    '62274138': 'Angie Lureidy Avila Rodriguez',
-    '62287385': 'Luisa Fernanda Ardila Parra',
-    '62293397': 'Jenny Andrea Ramirez',
-    '62295420': 'Ana Maria Moreno Chavez',
-    '62295400': 'Nelson Javier Borrego Hernandez',
-    '62295415': 'Diana Marcela Castro Cardenas',
-    '62295417': 'Ruben Dario Villamizar Rojas',
-    '62295374': 'Diana Caterin Rojas Rivera'
+    '80002749': {'nombre': 'Diana Paola Martinez Diaz', 'usuario': 'DMARTINEZ'},
+    '62208433': {'nombre': 'Nini Johanna Neira', 'usuario': 'NNEIRA'},
+    '62208420': {'nombre': 'Maria Lorena Ospina', 'usuario': 'MOSPINA'},
+    '62208383': {'nombre': 'Juan Sebastian Sanabria Cabezas', 'usuario': 'JSSANABRIA'},
+    '62208367': {'nombre': 'Yeimy Velasco', 'usuario': 'YEIVELASCO'},
+    '60005132': {'nombre': 'Angie Paola Muñoz', 'usuario': 'ADE-AMUNOZ'},
+    '80025780': {'nombre': 'Buitrago Baron Deisy Marley', 'usuario': 'DMBUITRAGO'},
+    '80005980': {'nombre': 'Caro Salamanca Wilson Alfredo', 'usuario': 'WCARO'},
+    '80003719': {'nombre': 'Carreño Diaz Natalia Andrea', 'usuario': 'NCARRENO'},
+    '60005117': {'nombre': 'Daniela Maria Herrera', 'usuario': 'ADE-DMHERRER'},
+    '80022209': {'nombre': 'Guerra Cabrera Carolina', 'usuario': 'CGUERRA'},
+    '80025779': {'nombre': 'Huerfano Davila Edgar Andres', 'usuario': 'EHUERFANO'},
+    '60005052': {'nombre': 'Jose Esteban Vargas', 'usuario': 'ADE-JVARGAS'},
+    '60006940': {'nombre': 'Juan Esteban Sanabria', 'usuario': 'ADE-JSANABRI'},
+    '60005371': {'nombre': 'Lenin Karina Triana', 'usuario': 'ADE-KTRIANA'},
+    '60005046': {'nombre': 'Luis Armando Chacon', 'usuario': 'ADE-ACHACON'},
+    '60005129': {'nombre': 'Luz Liliana Rodriguez', 'usuario': 'ADE-LRODRIGU'},
+    '60006593': {'nombre': 'Luz Liliana Rodriguez', 'usuario': 'LULRODRIGUEZ'},
+    '60006112': {'nombre': 'Mancera Reinosa Diana Maria', 'usuario': 'DMANCERA'},
+    '60006909': {'nombre': 'Maria Jose Alfonso', 'usuario': 'ADE-MALFONSO'},
+    '60005057': {'nombre': 'Maria Lorena Ospina', 'usuario': 'ADE-LOSPINA'},
+    '80000523': {'nombre': 'Rodriguez Gutierrez Paula Marcela', 'usuario': 'PRODRIGUEZ'},
+    '80025781': {'nombre': 'Yaima Motta Alejandra Lorena', 'usuario': 'AYAIMA'},
+    '60006707': {'nombre': 'Yeimy Velasco', 'usuario': 'ADE-YVELASCO'},
+    '62212713': {'nombre': 'Andres Castaño', 'usuario': 'ACASTANO'},
+    '62212735': {'nombre': 'Diana Shirley Quiroga Cubillos', 'usuario': 'ADE-DQUIROGA'},
+    '62214358': {'nombre': 'Paula Estefania Cardenas Diaz', 'usuario': 'ADE-PCARDENA'},
+    '62214530': {'nombre': 'Ana Milena Moyano Beltran', 'usuario': 'AMOYANO'},
+    '62212720': {'nombre': 'Lenin Karina Triana', 'usuario': 'LKTRIANA'},
+    '62215253': {'nombre': 'Angie Marcela Carranza Arbelaez', 'usuario': 'AMCARRANZA'},
+    '62219343': {'nombre': 'Johan Esteven Bernal Diaz', 'usuario': 'ADE-JBERNAL'},
+    '62219327': {'nombre': 'Karen Ximena Castañeda Cristancho', 'usuario': 'KXCASTANEDA'},
+    '62220971': {'nombre': 'Paula Estefania Cardenas Diaz', 'usuario': 'PCARDENAS'},
+    '62222408': {'nombre': 'Julieth Lorena Pacheco Vargas', 'usuario': 'ADE-JPACHECO'},
+    '62214888': {'nombre': 'Liliana Espitia', 'usuario': 'LESPITIA'},
+    '62222738': {'nombre': 'Diana Shirley Quiroga Cubillos', 'usuario': 'DSQUIROGA'},
+    '62231004': {'nombre': 'Dayana Ramirez', 'usuario': 'ANGDRAMIREZ'},
+    '62230354': {'nombre': 'Karen Ximena Castañeda Cristancho', 'usuario': 'KXCASTANEDA'},
+    '62237396': {'nombre': 'Johan Esteven Bernal Diaz', 'usuario': 'JOEBERNAL'},
+    '62237293': {'nombre': 'Douglas Enrique Mora', 'usuario': 'DEMORA'},
+    '62243896': {'nombre': 'Maria Alejandra Preciado', 'usuario': 'MAPRECIADO'},
+    '62246490': {'nombre': 'Norberto Alvarez', 'usuario': 'NOALVAREZ'},
+    '62252653': {'nombre': 'Hasbleidy Vanessa Rodriguez Beltran', 'usuario': 'HRODRIGUEZ'},
+    '62256597': {'nombre': 'Wilson Arley Perez', 'usuario': 'WIAPEREZ'},
+    '62259813': {'nombre': 'Ramiro Augusto Chavez', 'usuario': 'RCHAVEZ'},
+    '80024790': {'nombre': 'Heidy Maiyeth Alvarez', 'usuario': 'HALVAREZ'},
+    '62256596': {'nombre': 'Alexander Parga', 'usuario': 'APARGA'},
+    '62261836': {'nombre': 'Sandra Milena Pinzon', 'usuario': 'SMPINZON'},
+    '62261839': {'nombre': 'Andrea Gissette Turizo', 'usuario': 'AGTURIZO'},
+    '62266296': {'nombre': 'Nicol Estefani Porras', 'usuario': 'NPORRAS'},
+    '62273220': {'nombre': 'Erika Daniela Amaya Varela', 'usuario': 'EAMAYA'},
+    '62274136': {'nombre': 'Yuri Viviana Torres Garcia', 'usuario': 'YUVTORRES'},
+    '62274134': {'nombre': 'Yeraldin Iveth Correa Mateus', 'usuario': 'YICORREA'},
+    '62278611': {'nombre': 'Cesar Augusto Pinzon Calderon', 'usuario': 'CAPINZON'},
+    '62277236': {'nombre': 'Cristian Alexander Rodriguez Contreras', 'usuario': 'CRIARODRIGUE'},
+    '62274138': {'nombre': 'Angie Lureidy Avila Rodriguez', 'usuario': 'ANLAVILA'},
+    '62287385': {'nombre': 'Luisa Fernanda Ardila Parra', 'usuario': 'LUARDILA'},
+    '62293397': {'nombre': 'Jenny Andrea Ramirez', 'usuario': 'JENARAMIREZ'},
+    '62295420': {'nombre': 'Ana Maria Moreno Chavez', 'usuario': 'ANMMORENO'},
+    '62295400': {'nombre': 'Nelson Javier Borrego Hernandez', 'usuario': 'NBORREGO'},
+    '62295415': {'nombre': 'Diana Marcela Castro Cardenas', 'usuario': 'DIAMCASTRO'},
+    '62295417': {'nombre': 'Ruben Dario Villamizar Rojas', 'usuario': 'RVILLAMIZAR'},
+    '62295374': {'nombre': 'Diana Caterin Rojas Rivera', 'usuario': 'DIACROJAS'},
+    '62305995': {'nombre': 'Paola Andrea Pinilla Torres', 'usuario': 'PAPINILLA'}
 }
 
-# NUEVA TABLA: Mapeo de código homologación a Sub_tipo y FSE
+# Crear mapeo INVERSO por nombre de usuario
+tabla_validadores_por_usuario = {}
+for codigo, data in tabla_validadores.items():
+    usuario = data['usuario']
+    tabla_validadores_por_usuario[usuario] = {
+        'codigo': codigo,
+        'nombre': data['nombre']
+    }
+
+def obtener_info_validador(valor):
+    """
+    Obtiene información del validador ya sea por código numérico o por nombre de usuario
+    Retorna: (nombre_completo, usuario, codigo)
+    """
+    if pd.isna(valor) or valor == '':
+        return ('ALERTA VALIDADOR NO ENCONTRADO', 'ALERTA USUARIO NO ENCONTRADO', '')
+    
+    valor_limpio = str(valor).strip()
+    
+    # Intentar buscar por código numérico primero
+    if valor_limpio in tabla_validadores:
+        info = tabla_validadores[valor_limpio]
+        return (info['nombre'], info['usuario'], valor_limpio)
+    
+    # Si no, intentar buscar por nombre de usuario
+    if valor_limpio in tabla_validadores_por_usuario:
+        info = tabla_validadores_por_usuario[valor_limpio]
+        return (info['nombre'], valor_limpio, info['codigo'])
+    
+    # Si no se encuentra ni por código ni por usuario
+    return ('ALERTA VALIDADOR NO ENCONTRADO', 'ALERTA USUARIO NO ENCONTRADO', valor_limpio)
+
+# ============================================================================
+# TABLA SUB_TIPO Y FSE
+# ============================================================================
 tabla_sub_tipo_fse = {
     '200': {'sub_tipo': 'Inca. Enfermedad  General', 'fse': 'No Aplica'},
     '230': {'sub_tipo': 'Prorroga Inca/Enfer Gene', 'fse': 'Si Aplica'},
@@ -205,328 +225,428 @@ tabla_sub_tipo_fse = {
     '210': {'sub_tipo': 'Inc. Enfer. General Hospi', 'fse': 'No Aplica'},
     '231': {'sub_tipo': 'Prorr Inc/Enf Gral ntegra', 'fse': 'Si Aplica'},
     '281': {'sub_tipo': 'Incapacidad ARL SENA', 'fse': 'No Aplica'},
-    '301': {'sub_tipo': 'Licencia Maternidad Integ', 'fse': 'No Aplica'}
+    '301': {'sub_tipo': 'Licencia Maternidad Integ', 'fse': 'No Aplica'},
+    '100': {'sub_tipo': 'Vacaciones', 'fse': 'No Aplica'},
+    '189': {'sub_tipo': 'Suspension Explicita', 'fse': 'No Aplica'},
+    '190': {'sub_tipo': 'Permiso Remunerado', 'fse': 'No Aplica'},
+    '191': {'sub_tipo': 'Permiso No Remunerado', 'fse': 'No Aplica'},
+    '198': {'sub_tipo': 'Contrato Suspension', 'fse': 'No Aplica'},
+    '204': {'sub_tipo': 'Prorroga Quarentena', 'fse': 'No Aplica'},
+    '205': {'sub_tipo': 'Calamidad Familiar', 'fse': 'No Aplica'},
+    '330': {'sub_tipo': 'Calamidad Domestica', 'fse': 'No Aplica'},
+    '340': {'sub_tipo': 'Luto', 'fse': 'No Aplica'},
+    '380': {'sub_tipo': 'Licencia No Justificada', 'fse': 'No Aplica'},
+    '381': {'sub_tipo': 'Suspension', 'fse': 'No Aplica'},
+    '397': {'sub_tipo': 'Registro Sin Jornada', 'fse': 'No Aplica'},
+    '187': {'sub_tipo': 'Incapacidad ARL', 'fse': 'No Aplica'},
+    '197': {'sub_tipo': 'Licencia Injustificada Int', 'fse': 'No Aplica'},
+    '341': {'sub_tipo': 'Luto Integral', 'fse': 'No Aplica'},
+    '216': {'sub_tipo': 'Inc. Accidente Trabajo Int', 'fse': 'No Aplica'},
+    '195': {'sub_tipo': 'Suspension Integral', 'fse': 'No Aplica'},
+    '192': {'sub_tipo': 'No Laboral', 'fse': 'No Aplica'},
+    '206': {'sub_tipo': 'Delicadeza', 'fse': 'No Aplica'},
+    '334': {'sub_tipo': 'Prorroga Cuarentena Int', 'fse': 'No Aplica'},
+    '233': {'sub_tipo': 'Prorroga Enfermedad Int', 'fse': 'Si Aplica'},
+    '331': {'sub_tipo': 'Calamidad Domestica Int', 'fse': 'No Aplica'},
+    '345': {'sub_tipo': 'Votacion', 'fse': 'No Aplica'},
+    '196': {'sub_tipo': 'Permiso No Remun Integral', 'fse': 'No Aplica'},
+    '398': {'sub_tipo': 'Maternidad SENA', 'fse': 'No Aplica'},
+    '399': {'sub_tipo': 'Aus.Sin Soporte Rech Docs', 'fse': 'No Aplica'},
+
+    
 }
 
-def limpiar_fecha_para_llave(fecha_str):
+# ============================================================================
+# FUNCIONES AUXILIARES
+# ============================================================================
+def convertir_fecha_a_excel(fecha_str):
     """
-    Función que REALMENTE limpia las fechas para la llave - quita TODO lo que no sea número
+    Convierte fechas de formato YYYY-MM-DD HH:MM:SS a DD/MM/YYYY para Excel
     """
     if pd.isna(fecha_str) or fecha_str == '' or str(fecha_str).lower() in ['nan', 'none', 'nat']:
         return ''
     
-    # Convertir a string y quitar TODO lo que no sea dígito
+    try:
+        # Si ya es formato DD/MM/YYYY, dejarlo como está
+        if '/' in str(fecha_str):
+            return str(fecha_str).split()[0]  # Quitar hora si existe
+        
+        # Si es formato YYYY-MM-DD o similar
+        fecha_str_limpia = str(fecha_str).split()[0]  # Quitar la hora
+        
+        # Intentar parsear la fecha
+        if '-' in fecha_str_limpia:
+            partes = fecha_str_limpia.split('-')
+            if len(partes) == 3:
+                año, mes, dia = partes
+                # Convertir a DD/MM/YYYY
+                return f"{dia.zfill(2)}/{mes.zfill(2)}/{año}"
+        
+        return fecha_str_limpia
+    except:
+        return str(fecha_str)
+
+def limpiar_fecha_para_llave(fecha_str):
+    """Limpia fechas para la llave - quita TODO lo que no sea número"""
+    if pd.isna(fecha_str) or fecha_str == '' or str(fecha_str).lower() in ['nan', 'none', 'nat']:
+        return ''
     fecha_limpia = ''.join(c for c in str(fecha_str) if c.isdigit())
     return fecha_limpia
 
+def convertir_codigo_sap_a_ssf(codigo_sap):
+    """
+    Convierte un código SAP (ej: '205') a código SSF (ej: 'CO_FAMILY')
+    Usa la tabla inversa de homologación
+    """
+    if pd.isna(codigo_sap) or codigo_sap == '':
+        return ''
+    codigo_limpio = str(codigo_sap).strip()
+    return tabla_homologacion_inversa.get(codigo_limpio, codigo_limpio)
+
+# ============================================================================
+# FUNCIÓN PRINCIPAL
+# ============================================================================
 def procesar_archivo_ausentismos():
     """
-    Función principal que procesa el archivo de ausentismos
+    Función principal que procesa ambos archivos y genera el CSV final
     """
-    print("=== PROCESAMIENTO DE AUSENTISMOS ===")
+    print("="*80)
+    print("=== PROCESAMIENTO DE AUSENTISMOS - VERSIÓN COMPLETA ===")
+    print("="*80)
     
     try:
-        # PASO 1: Leer el archivo usando los headers que ya tiene
-        print("1. Leyendo archivo CSV...")
+        # ====================================================================
+        # PASO 1: LEER ARCHIVO CSV
+        # ====================================================================
+        print("\n[PASO 1] Leyendo archivo CSV principal...")
+        df_csv = pd.read_csv(ruta_entrada_csv, skiprows=2, encoding='utf-8', dtype=str)
+        print(f"   ✓ CSV leído: {df_csv.shape[0]} filas, {df_csv.shape[1]} columnas")
         
-        df = pd.read_csv(ruta_entrada, skiprows=2, encoding='utf-8', dtype=str)
+        # Seleccionar columnas del CSV
+        columnas_csv_encontradas = [col for col in columnas_csv if col in df_csv.columns]
+        df_csv_filtrado = df_csv[columnas_csv_encontradas].copy()
         
-        print(f"   ✓ Archivo leído: {df.shape[0]} filas, {df.shape[1]} columnas")
-        print(f"   ✓ Primeras columnas: {list(df.columns[:5])}")
+        # CRÍTICO: Asegurar que lastModifiedBy del CSV también sea STRING
+        if 'lastModifiedBy' in df_csv_filtrado.columns:
+            df_csv_filtrado['lastModifiedBy'] = df_csv_filtrado['lastModifiedBy'].astype(str)
         
-        # PASO 2: Verificar que tenemos las columnas que necesitamos
-        print("\n2. Verificando columnas requeridas...")
+        print(f"   ✓ Columnas filtradas del CSV: {len(columnas_csv_encontradas)}")
         
-        columnas_encontradas = []
-        columnas_faltantes = []
+        # ====================================================================
+        # PASO 2: LEER ARCHIVO EXCEL
+        # ====================================================================
+        print("\n[PASO 2] Leyendo archivo Excel para CONCAT...")
+        df_excel = pd.read_excel(ruta_entrada_excel, dtype=str)
+        print(f"   ✓ Excel leído: {df_excel.shape[0]} filas, {df_excel.shape[1]} columnas")
+        print(f"   ✓ Columnas Excel: {list(df_excel.columns[:10])}")
         
-        for col in columnas_requeridas:
-            if col in df.columns:
-                columnas_encontradas.append(col)
-            else:
-                columnas_faltantes.append(col)
+        # Renombrar columnas del Excel para que coincidan
+        mapeo_excel = {
+            'Número de personal': 'ID personal',
+            'Nombre empl./cand.': 'Nombre completo',
+            'Txt.cl.pres./ab.': 'externalName (Label)',
+            'Inicio de validez': 'startDate',
+            'Fin de validez': 'endDate',
+            'Días presenc./abs.': 'quantityInDays',
+            'Días naturales': 'Calendar Days',
+            'Descripc.enfermedad': 'Descripción General (Picklist Label)',
+            'Modificado por': 'lastModifiedBy',  # MANTENER COMO STRING
+            'Final': 'Last Approval Status Date',
+            'Clase absent./pres.': 'codigo_sap_original'  # Columna especial
+        }
         
-        print(f"   ✓ Columnas encontradas: {len(columnas_encontradas)}/22")
-        if columnas_faltantes:
-            print(f"   ⚠ Columnas faltantes: {columnas_faltantes}")
+        # Aplicar mapeo
+        df_excel_renamed = df_excel.rename(columns=mapeo_excel)
         
-        # PASO 3: Extraer solo las columnas que necesitamos
-        print("\n3. Extrayendo columnas específicas...")
-        df_especifico = df[columnas_encontradas].copy()
+        # CRÍTICO: Asegurar que lastModifiedBy sea STRING
+        if 'lastModifiedBy' in df_excel_renamed.columns:
+            df_excel_renamed['lastModifiedBy'] = df_excel_renamed['lastModifiedBy'].astype(str)
+            print(f"   ✓ lastModifiedBy convertido a STRING")
+            print(f"   📋 Ejemplos de valores: {df_excel_renamed['lastModifiedBy'].head(5).tolist()}")
         
-        print(f"   ✓ DataFrame específico: {df_especifico.shape}")
+        print(f"   ✓ Columnas renombradas en Excel")
         
-        # PASO 4: Verificar los datos
-        print("\n4. Verificando primeros datos...")
-        print(f"   ID personal: {df_especifico['ID personal'].iloc[0]}")
-        print(f"   Nombre: {df_especifico['Nombre completo'].iloc[0]}")
-        print(f"   Fecha inicio: {df_especifico['startDate'].iloc[0]}")
-        
-        # PASO 5: Aplicar mapeo de nombres y agregar columna de homologación
-        print("\n5. Aplicando mapeo de columnas y agregando homologación...")
-        
-        # Crear la columna de homologación ANTES del mapeo de nombres
-        if 'externalCode' in df_especifico.columns:
-            print("   🔧 Creando columna de homologación SSF vs SAP...")
+        # ====================================================================
+        # PASO 2.5: CONVERTIR CÓDIGOS SAP A SSF EN EXCEL
+        # ====================================================================
+        print("\n[PASO 2.5] Convirtiendo códigos SAP a SSF en archivo Excel...")
+        if 'codigo_sap_original' in df_excel_renamed.columns:
+            df_excel_renamed['externalCode'] = df_excel_renamed['codigo_sap_original'].apply(convertir_codigo_sap_a_ssf)
             
-            df_especifico['Homologacion_clase_de_ausentismo_SSF_vs_SAP'] = df_especifico['externalCode'].map(tabla_homologacion)
+            ejemplos_conversion = df_excel_renamed[['codigo_sap_original', 'externalCode']].head(5)
+            print("   📋 Ejemplos de conversión SAP → SSF:")
+            for idx, row in ejemplos_conversion.iterrows():
+                print(f"      {row['codigo_sap_original']} → {row['externalCode']}")
             
-            valores_encontrados = df_especifico['Homologacion_clase_de_ausentismo_SSF_vs_SAP'].notna().sum()
-            valores_totales = len(df_especifico)
-            valores_no_encontrados = valores_totales - valores_encontrados
-            
-            print(f"   ✓ Homologación aplicada: {valores_encontrados}/{valores_totales} códigos encontrados")
-            if valores_no_encontrados > 0:
-                codigos_faltantes = df_especifico[df_especifico['Homologacion_clase_de_ausentismo_SSF_vs_SAP'].isna()]['externalCode'].unique()
-                print(f"   ⚠ Códigos no encontrados en tabla de homologación: {list(codigos_faltantes)}")
-            
-            print("   📋 Ejemplos de homologación:")
-            for i in range(min(5, len(df_especifico))):
-                codigo = df_especifico['externalCode'].iloc[i]
-                homolog = df_especifico['Homologacion_clase_de_ausentismo_SSF_vs_SAP'].iloc[i]
-                print(f"      {codigo} → {homolog}")
+            # Eliminar columna temporal
+            df_excel_renamed = df_excel_renamed.drop(['codigo_sap_original'], axis=1)
         
-        # PASO 5.5: CREAR COLUMNA NOMBRE_VALIDADOR
-        print("\n5.5 Creando columna NOMBRE_VALIDADOR...")
+        # ====================================================================
+        # PASO 3: CONCATENAR CSV + EXCEL
+        # ====================================================================
+        print("\n[PASO 3] Concatenando CSV y Excel...")
+        df_combinado = pd.concat([df_csv_filtrado, df_excel_renamed], ignore_index=True, sort=False)
+        print(f"   ✓ Datos combinados: {df_combinado.shape[0]} filas totales")
+        print(f"   ✓ CSV: {df_csv_filtrado.shape[0]} filas")
+        print(f"   ✓ Excel: {df_excel_renamed.shape[0]} filas")
         
-        if 'lastModifiedBy' in df_especifico.columns:
-            print("   🔧 Mapeando códigos de aprobador a nombres...")
+        # ====================================================================
+        # PASO 3.5: CONVERTIR FECHAS A FORMATO DD/MM/YYYY
+        # ====================================================================
+        print("\n[PASO 3.5] Convirtiendo fechas a formato DD/MM/YYYY...")
+        
+        columnas_fecha = ['startDate', 'endDate', 'Last Approval Status Date']
+        
+        for col in columnas_fecha:
+            if col in df_combinado.columns:
+                print(f"   🔧 Convirtiendo columna: {col}")
+                print(f"      Ejemplo ANTES: {df_combinado[col].iloc[0]}")
+                
+                df_combinado[col] = df_combinado[col].apply(convertir_fecha_a_excel)
+                
+                print(f"      Ejemplo DESPUÉS: {df_combinado[col].iloc[0]}")
+        
+        print(f"   ✓ Fechas convertidas a formato DD/MM/YYYY")
+        
+        # ====================================================================
+        # PASO 4: CREAR COLUMNA DE HOMOLOGACIÓN (SSF → SAP)
+        # ====================================================================
+        print("\n[PASO 4] Creando columna de homologación SSF vs SAP...")
+        if 'externalCode' in df_combinado.columns:
+            df_combinado['Homologacion_clase_de_ausentismo_SSF_vs_SAP'] = df_combinado['externalCode'].map(tabla_homologacion)
             
-            df_especifico['lastModifiedBy_limpio'] = df_especifico['lastModifiedBy'].astype(str).str.strip()
+            valores_encontrados = df_combinado['Homologacion_clase_de_ausentismo_SSF_vs_SAP'].notna().sum()
+            print(f"   ✓ Homologación aplicada: {valores_encontrados}/{len(df_combinado)} códigos")
+        
+        # ====================================================================
+        # PASO 5: CREAR LLAVE (ANTES DE ELIMINAR DUPLICADOS)
+        # ====================================================================
+        print("\n[PASO 5] Creando columna LLAVE...")
+        df_combinado['startDate_limpia'] = df_combinado['startDate'].apply(limpiar_fecha_para_llave)
+        df_combinado['endDate_limpia'] = df_combinado['endDate'].apply(limpiar_fecha_para_llave)
+        
+        df_combinado['llave'] = (
+            df_combinado['ID personal'].astype(str).fillna('') +
+            df_combinado['startDate_limpia'] +
+            df_combinado['endDate_limpia'] +
+            df_combinado['Homologacion_clase_de_ausentismo_SSF_vs_SAP'].astype(str).fillna('')
+        )
+        
+        # Agregar prefijo K
+        df_combinado['llave'] = 'K' + df_combinado['llave'].astype(str)
+        
+        print(f"   ✓ Llaves creadas: {len(df_combinado)}")
+        print(f"   📋 Ejemplos de llaves:")
+        for llave in df_combinado['llave'].head(3):
+            print(f"      {llave}")
+        
+        # Limpiar columnas temporales
+        df_combinado = df_combinado.drop(['startDate_limpia', 'endDate_limpia'], axis=1)
+        
+        # ====================================================================
+        # PASO 6: ELIMINAR DUPLICADOS POR LLAVE
+        # ====================================================================
+        print("\n[PASO 6] Eliminando duplicados por llave...")
+        registros_antes = len(df_combinado)
+        duplicados_encontrados = df_combinado['llave'].duplicated().sum()
+        
+        print(f"   ⚠ Duplicados encontrados: {duplicados_encontrados}")
+        
+        if duplicados_encontrados > 0:
+            # Mantener el primer registro de cada llave
+            df_combinado = df_combinado.drop_duplicates(subset=['llave'], keep='first')
+            registros_despues = len(df_combinado)
+            eliminados = registros_antes - registros_despues
             
-            # Aplicar el mapeo y poner "ALERTA VALIDADOR NO ENCONTRADO" cuando no hay match
-            df_especifico['nombre_validador'] = df_especifico['lastModifiedBy_limpio'].map(tabla_validadores).fillna('ALERTA VALIDADOR NO ENCONTRADO')
-            
-            validadores_encontrados = (df_especifico['nombre_validador'] != 'ALERTA VALIDADOR NO ENCONTRADO').sum()
-            validadores_totales = len(df_especifico)
-            validadores_no_encontrados = validadores_totales - validadores_encontrados
-            
-            print(f"   ✓ Nombres de validadores mapeados: {validadores_encontrados}/{validadores_totales}")
-            
-            if validadores_no_encontrados > 0:
-                codigos_validadores_faltantes = df_especifico[df_especifico['nombre_validador'] == 'ALERTA VALIDADOR NO ENCONTRADO']['lastModifiedBy_limpio'].unique()
-                print(f"   ⚠ ALERTA: {validadores_no_encontrados} registros con validador no encontrado")
-                print(f"   ⚠ Códigos de validadores no encontrados: {list(codigos_validadores_faltantes)[:10]}")
-            
-            print("   📋 Ejemplos de mapeo de validadores:")
-            for i in range(min(5, len(df_especifico))):
-                codigo_val = df_especifico['lastModifiedBy_limpio'].iloc[i]
-                nombre_val = df_especifico['nombre_validador'].iloc[i]
-                print(f"      {codigo_val} → {nombre_val}")
-            
-            df_especifico = df_especifico.drop(['lastModifiedBy_limpio'], axis=1)
+            print(f"   ✓ Registros eliminados: {eliminados}")
+            print(f"   ✓ Registros finales: {registros_despues}")
         else:
-            print("   ❌ No se encontró la columna 'lastModifiedBy'")
+            print(f"   ✅ No hay duplicados - todas las llaves son únicas")
         
-        # PASO 5.55: CREAR COLUMNAS SUB_TIPO Y FSE
-        print("\n5.55 Creando columnas SUB_TIPO y FSE...")
-        
-        if 'Homologacion_clase_de_ausentismo_SSF_vs_SAP' in df_especifico.columns:
-            print("   🔧 Mapeando códigos de homologación a Sub_tipo y FSE...")
+        # ====================================================================
+        # PASO 7: CREAR COLUMNAS DE VALIDADOR (NOMBRE Y USUARIO)
+        # ====================================================================
+        print("\n[PASO 7] Creando columnas de validador (maneja códigos Y usuarios)...")
+        if 'lastModifiedBy' in df_combinado.columns:
+            print("   🔧 Procesando lastModifiedBy (puede contener códigos o usuarios)...")
             
-            # Crear las columnas usando el mapeo
-            df_especifico['Sub_tipo'] = df_especifico['Homologacion_clase_de_ausentismo_SSF_vs_SAP'].map(
+            # Aplicar la función que maneja ambos casos
+            validador_info = df_combinado['lastModifiedBy'].apply(obtener_info_validador)
+            
+            # Separar en 3 columnas
+            df_combinado['nombre_validador'] = validador_info.apply(lambda x: x[0])
+            df_combinado['usuario_validador'] = validador_info.apply(lambda x: x[1])
+            df_combinado['codigo_validador'] = validador_info.apply(lambda x: x[2])
+            
+            validadores_ok = (df_combinado['nombre_validador'] != 'ALERTA VALIDADOR NO ENCONTRADO').sum()
+            print(f"   ✓ Validadores mapeados: {validadores_ok}/{len(df_combinado)}")
+            
+            # Mostrar ejemplos
+            print(f"\n   📋 Ejemplos de conversión (primeros 5):")
+            for i in range(min(5, len(df_combinado))):
+                original = df_combinado['lastModifiedBy'].iloc[i]
+                nombre = df_combinado['nombre_validador'].iloc[i]
+                usuario = df_combinado['usuario_validador'].iloc[i]
+                codigo = df_combinado['codigo_validador'].iloc[i]
+                print(f"      '{original}' → Nombre: {nombre}, Usuario: {usuario}, Código: {codigo}")
+        
+        # ====================================================================
+        # PASO 8: CREAR COLUMNAS SUB_TIPO Y FSE
+        # ====================================================================
+        print("\n[PASO 8] Creando columnas Sub_tipo y FSE...")
+        if 'Homologacion_clase_de_ausentismo_SSF_vs_SAP' in df_combinado.columns:
+            df_combinado['Sub_tipo'] = df_combinado['Homologacion_clase_de_ausentismo_SSF_vs_SAP'].apply(
                 lambda x: tabla_sub_tipo_fse.get(str(x), {}).get('sub_tipo', 'ALERTA SUB_TIPO NO ENCONTRADO') if pd.notna(x) else 'ALERTA SUB_TIPO NO ENCONTRADO'
             )
             
-            df_especifico['FSE'] = df_especifico['Homologacion_clase_de_ausentismo_SSF_vs_SAP'].map(
+            df_combinado['FSE'] = df_combinado['Homologacion_clase_de_ausentismo_SSF_vs_SAP'].apply(
                 lambda x: tabla_sub_tipo_fse.get(str(x), {}).get('fse', 'No Aplica') if pd.notna(x) else 'No Aplica'
             )
             
-            # Contar valores encontrados
-            sub_tipo_encontrados = (df_especifico['Sub_tipo'] != 'ALERTA SUB_TIPO NO ENCONTRADO').sum()
-            fse_aplicables = (df_especifico['FSE'] == 'Si Aplica').sum()
-            fse_no_aplicables = (df_especifico['FSE'] == 'No Aplica').sum()
-            totales = len(df_especifico)
+            sub_tipo_ok = (df_combinado['Sub_tipo'] != 'ALERTA SUB_TIPO NO ENCONTRADO').sum()
+            fse_si = (df_combinado['FSE'] == 'Si Aplica').sum()
+            fse_no = (df_combinado['FSE'] == 'No Aplica').sum()
             
-            print(f"   ✓ Sub_tipo mapeados: {sub_tipo_encontrados}/{totales}")
-            print(f"   ✓ FSE - Si Aplica: {fse_aplicables}")
-            print(f"   ✓ FSE - No Aplica: {fse_no_aplicables}")
-            
-            # Mostrar códigos no encontrados
-            codigos_no_encontrados = df_especifico[df_especifico['Sub_tipo'] == 'ALERTA SUB_TIPO NO ENCONTRADO']['Homologacion_clase_de_ausentismo_SSF_vs_SAP'].unique()
-            codigos_no_encontrados = [c for c in codigos_no_encontrados if pd.notna(c) and c != '']
-            if codigos_no_encontrados:
-                print(f"   ⚠ ALERTA: Códigos sin Sub_tipo: {list(codigos_no_encontrados)}")
-            
-            # Mostrar ejemplos
-            print("   📋 Ejemplos de mapeo Sub_tipo y FSE:")
-            for i in range(min(5, len(df_especifico))):
-                codigo_homolog = df_especifico['Homologacion_clase_de_ausentismo_SSF_vs_SAP'].iloc[i]
-                sub_tipo_val = df_especifico['Sub_tipo'].iloc[i]
-                fse_val = df_especifico['FSE'].iloc[i]
-                print(f"      Código {codigo_homolog} → Sub_tipo: '{sub_tipo_val}', FSE: '{fse_val}'")
-        else:
-            print("   ❌ No se encontró la columna 'Homologacion_clase_de_ausentismo_SSF_vs_SAP'")
+            print(f"   ✓ Sub_tipo mapeados: {sub_tipo_ok}/{len(df_combinado)}")
+            print(f"   ✓ FSE - Si Aplica: {fse_si}")
+            print(f"   ✓ FSE - No Aplica: {fse_no}")
         
-        # PASO 5.6: CREAR COLUMNA LLAVE
-        print("\n5.6 Creando columna LLAVE (SIN barras en fechas)...")
+        # ====================================================================
+        # PASO 9: MAPEO FINAL DE NOMBRES DE COLUMNAS
+        # ====================================================================
+        print("\n[PASO 9] Aplicando mapeo de nombres de columnas...")
         
-        columnas_llave_originales = ['ID personal', 'startDate', 'endDate', 'Homologacion_clase_de_ausentismo_SSF_vs_SAP']
-        columnas_disponibles = all(col in df_especifico.columns for col in columnas_llave_originales)
+        mapeo_columnas_final = {
+            'ID personal': 'id_personal',
+            'Nombre completo': 'nombre_completo',
+            'Cod Función (externalCode)': 'cod_funcion_external_code',
+            'Cod Función (Label)': 'cod_funcion_label',
+            'Tipo de Documento de Identidad': 'tipo_documento_identidad',
+            'Número de Documento de Identidad': 'numero_documento_identidad',
+            'Estado de empleado (Picklist Label)': 'estado_empleado_picklist_label',
+            'externalCode': 'external_code',
+            'externalName (Label)': 'external_name_label',
+            'startDate': 'start_date',
+            'endDate': 'end_date',
+            'quantityInDays': 'quantity_in_days',
+            'Calendar Days': 'calendar_days',
+            'Descripción General (External Code)': 'descripcion_general_external_code',
+            'Descripción General (Picklist Label)': 'descripcion_general_picklist_label',
+            'Fecha de inicio de ausentismo': 'fecha_inicio_ausentismo',
+            'Agregador global de ausencias (Picklist Label)': 'agregador_global_ausencias_picklist_label',
+            'lastModifiedBy': 'last_modified_by',
+            'Last Approval Status Date': 'last_approval_status_date',
+            'HR Personnel Subarea': 'hr_personnel_subarea',
+            'HR Personnel Subarea Name': 'hr_personnel_subarea_name',
+            'approvalStatus': 'approval_status',
+            'Homologacion_clase_de_ausentismo_SSF_vs_SAP': 'homologacion_clase_de_ausentismo_ssf_vs_sap',
+            'llave': 'llave',
+            'nombre_validador': 'nombre_validador',
+            'usuario_validador': 'usuario_validador',
+            'codigo_validador': 'codigo_validador',
+            'Sub_tipo': 'sub_tipo',
+            'FSE': 'fse'
+        }
         
-        if columnas_disponibles:
-            print("   🔧 Limpiando fechas y creando llave SOLO CON NÚMEROS...")
-            
-            print("   📋 Ejemplos de fechas ANTES de limpiar:")
-            for i in range(min(3, len(df_especifico))):
-                start_orig = df_especifico['startDate'].iloc[i]
-                end_orig = df_especifico['endDate'].iloc[i]
-                print(f"      Fila {i+1}: start='{start_orig}', end='{end_orig}'")
-            
-            df_especifico['startDate_limpia'] = df_especifico['startDate'].apply(limpiar_fecha_para_llave)
-            df_especifico['endDate_limpia'] = df_especifico['endDate'].apply(limpiar_fecha_para_llave)
-            
-            print("   📋 Ejemplos de fechas DESPUÉS de limpiar:")
-            for i in range(min(3, len(df_especifico))):
-                start_limpia = df_especifico['startDate_limpia'].iloc[i]
-                end_limpia = df_especifico['endDate_limpia'].iloc[i]
-                print(f"      Fila {i+1}: start='{start_limpia}', end='{end_limpia}'")
-            
-            df_especifico['llave'] = (
-                df_especifico['ID personal'].astype(str).fillna('') +
-                df_especifico['startDate_limpia'] +
-                df_especifico['endDate_limpia'] +
-                df_especifico['Homologacion_clase_de_ausentismo_SSF_vs_SAP'].astype(str).fillna('')
-            )
-            
-            print(f"   ✓ Columna llave creada con {len(df_especifico)} registros")
-            
-            print("   📋 Ejemplos de llaves generadas (FINAL):")
-            for i in range(min(5, len(df_especifico))):
-                id_pers = df_especifico['ID personal'].iloc[i]
-                start_limpia = df_especifico['startDate_limpia'].iloc[i]
-                end_limpia = df_especifico['endDate_limpia'].iloc[i]
-                homolog = df_especifico['Homologacion_clase_de_ausentismo_SSF_vs_SAP'].iloc[i]
-                llave = df_especifico['llave'].iloc[i]
-                print(f"      {id_pers} + {start_limpia} + {end_limpia} + {homolog} = {llave}")
-            
-            df_especifico = df_especifico.drop(['startDate_limpia', 'endDate_limpia'], axis=1)
-            
-            duplicados = df_especifico['llave'].duplicated().sum()
-            if duplicados > 0:
-                print(f"   ⚠ Se encontraron {duplicados} llaves duplicadas")
-            else:
-                print(f"   ✅ Todas las llaves son únicas")
-                
-        else:
-            print("   ❌ No se pueden crear las llaves - faltan columnas requeridas")
-            columnas_faltantes_llave = [col for col in columnas_llave_originales if col not in df_especifico.columns]
-            print(f"   ❌ Columnas faltantes: {columnas_faltantes_llave}")
+        # Aplicar solo las columnas que existen
+        mapeo_aplicable = {k: v for k, v in mapeo_columnas_final.items() if k in df_combinado.columns}
+        df_final = df_combinado.rename(columns=mapeo_aplicable)
         
-        mapeo_actual = {col: mapeo_columnas[col] for col in df_especifico.columns if col in mapeo_columnas}
-        df_final = df_especifico.rename(columns=mapeo_actual)
+        print(f"   ✓ Columnas renombradas: {len(mapeo_aplicable)}")
+        print(f"   ✓ Total columnas finales: {len(df_final.columns)}")
         
-        print(f"   ✓ Columnas renombradas: {len(mapeo_actual)}")
-        print(f"   ✓ Columnas finales: {len(df_final.columns)} (incluyendo homologación, llave, nombre_validador, sub_tipo y fse)")
+        # ====================================================================
+        # PASO 10: LIMPIEZA FINAL Y GUARDADO
+        # ====================================================================
+        print("\n[PASO 10] Limpieza final y guardado...")
         
-        # PASO 6: Limpiar y guardar
-        print("\n6. Limpiando datos y guardando archivo...")
-        
+        # Crear directorio si no existe
         if not os.path.exists(directorio_salida):
             os.makedirs(directorio_salida)
         
-        if 'tipo_documento_identidad' in df_final.columns:
-            df_final['tipo_documento_identidad'] = df_final['tipo_documento_identidad'].fillna('')
+        # CRÍTICO: Asegurar que last_modified_by sea STRING en salida final
+        if 'last_modified_by' in df_final.columns:
+            print("   🔧 Forzando last_modified_by como STRING...")
+            df_final['last_modified_by'] = df_final['last_modified_by'].astype(str)
+            # Agregar comillas para forzar que Excel lo lea como texto
+            df_final['last_modified_by'] = '"' + df_final['last_modified_by'] + '"'
+            print(f"   ✓ Ejemplos de last_modified_by: {df_final['last_modified_by'].head(3).tolist()}")
         
+        # Limpiar número de documento
         if 'numero_documento_identidad' in df_final.columns:
-            print("   🔧 Corrigiendo numero_documento_identidad...")
             df_final['numero_documento_identidad'] = df_final['numero_documento_identidad'].astype(str).replace('nan', '')
             df_final['numero_documento_identidad'] = '"' + df_final['numero_documento_identidad'] + '"'
-            print(f"   ✓ Ejemplos corregidos: {df_final['numero_documento_identidad'].head(3).tolist()}")
         
-        if 'llave' in df_final.columns:
-            print("   🔧 Agregando prefijo a la llave para evitar notación científica...")
-            df_final['llave'] = 'K' + df_final['llave'].astype(str)
-            print(f"   ✓ Ejemplos de llaves con prefijo: {df_final['llave'].head(3).tolist()}")
-        
+        # Guardar archivo
         df_final.to_csv(ruta_completa_salida, index=False, encoding='utf-8', quoting=2)
         
         print(f"   ✓ Archivo guardado: {ruta_completa_salida}")
         print(f"   ✓ Registros procesados: {len(df_final)}")
-        print(f"   ✓ Columna nombre_validador agregada exitosamente")
-        print(f"   ✓ Columnas sub_tipo y fse agregadas exitosamente")
         
-        # PASO 7: Mostrar resumen final
-        print("\n=== RESUMEN FINAL ===")
-        print(f"Columnas procesadas: {len(df_final.columns)}")
-        for i, col in enumerate(df_final.columns, 1):
-            print(f"{i:2d}. {col}")
+        # ====================================================================
+        # RESUMEN FINAL
+        # ====================================================================
+        print("\n" + "="*80)
+        print("=== RESUMEN FINAL DEL PROCESAMIENTO ===")
+        print("="*80)
         
-        print(f"\nPrimera fila de ejemplo:")
-        primera_fila = df_final.iloc[0]
-        for col in list(df_final.columns)[:12]:
-            print(f"  {col}: {primera_fila[col]}")
+        print(f"\n📊 ESTADÍSTICAS GENERALES:")
+        print(f"   Total de registros: {len(df_final)}")
+        print(f"   Total de columnas: {len(df_final.columns)}")
+        print(f"   Registros únicos por llave: {df_final['llave'].nunique()}")
         
         if 'homologacion_clase_de_ausentismo_ssf_vs_sap' in df_final.columns:
-            print(f"\n📊 ESTADÍSTICAS DE HOMOLOGACIÓN:")
-            homolog_stats = df_final['homologacion_clase_de_ausentismo_ssf_vs_sap'].value_counts()
-            print(f"   Total de códigos únicos homologados: {len(homolog_stats)}")
-            print(f"   Códigos más frecuentes:")
-            for codigo, freq in homolog_stats.head(5).items():
-                print(f"     {codigo}: {freq} registros")
+            print(f"\n📋 HOMOLOGACIÓN SSF vs SAP:")
+            homolog_stats = df_final['homologacion_clase_de_ausentismo_ssf_vs_sap'].value_counts().head(10)
+            print(f"   Códigos SAP más frecuentes:")
+            for codigo, freq in homolog_stats.items():
+                porcentaje = (freq / len(df_final)) * 100
+                print(f"      {codigo}: {freq} registros ({porcentaje:.1f}%)")
         
         if 'sub_tipo' in df_final.columns and 'fse' in df_final.columns:
-            print(f"\n📋 ESTADÍSTICAS DE SUB_TIPO Y FSE:")
+            print(f"\n🏥 SUB_TIPO Y FSE:")
             
-            # Contar Sub_tipos con alerta
             sub_tipo_alertas = (df_final['sub_tipo'] == 'ALERTA SUB_TIPO NO ENCONTRADO').sum()
-            sub_tipo_ok = (df_final['sub_tipo'] != 'ALERTA SUB_TIPO NO ENCONTRADO').sum()
-            
-            print(f"   Total de registros con Sub_tipo: {sub_tipo_ok}")
             if sub_tipo_alertas > 0:
-                print(f"   🚨 Registros con ALERTA SUB_TIPO NO ENCONTRADO: {sub_tipo_alertas}")
+                print(f"   🚨 Alertas de Sub_tipo: {sub_tipo_alertas} registros")
             
-            # Contar por tipo de FSE
+            print(f"\n   Top 5 Sub_tipos:")
+            sub_tipo_top = df_final[df_final['sub_tipo'] != 'ALERTA SUB_TIPO NO ENCONTRADO']['sub_tipo'].value_counts().head(5)
+            for sub_tipo, freq in sub_tipo_top.items():
+                porcentaje = (freq / len(df_final)) * 100
+                print(f"      {sub_tipo}: {freq} ({porcentaje:.1f}%)")
+            
+            print(f"\n   Distribución FSE:")
             fse_stats = df_final['fse'].value_counts()
-            print(f"   Distribución FSE:")
             for fse_val, freq in fse_stats.items():
                 porcentaje = (freq / len(df_final)) * 100
-                print(f"     {fse_val}: {freq} registros ({porcentaje:.1f}%)")
-            
-            # Mostrar algunos Sub_tipos más comunes (excluyendo alertas)
-            print(f"   Sub_tipos más frecuentes:")
-            sub_tipo_stats = df_final[df_final['sub_tipo'] != 'ALERTA SUB_TIPO NO ENCONTRADO']['sub_tipo'].value_counts().head(5)
-            for sub_tipo_val, freq in sub_tipo_stats.items():
-                print(f"     {sub_tipo_val}: {freq} registros")
+                print(f"      {fse_val}: {freq} registros ({porcentaje:.1f}%)")
         
         if 'nombre_validador' in df_final.columns:
-            print(f"\n👤 ESTADÍSTICAS DE VALIDADORES:")
-            validadores_stats = df_final['nombre_validador'].value_counts()
-            print(f"   Total de validadores únicos: {len(validadores_stats)}")
-            print(f"   Validadores más frecuentes:")
+            print(f"\n👤 VALIDADORES:")
             
-            # Contar los que tienen alerta
-            alertas_count = (df_final['nombre_validador'] == 'ALERTA VALIDADOR NO ENCONTRADO').sum()
+            validador_alertas = (df_final['nombre_validador'] == 'ALERTA VALIDADOR NO ENCONTRADO').sum()
+            if validador_alertas > 0:
+                print(f"   🚨 Alertas de validadores: {validador_alertas} registros ({(validador_alertas/len(df_final)*100):.1f}%)")
             
-            # Mostrar top 5 (excluyendo las alertas para el top)
-            top_validadores = df_final[df_final['nombre_validador'] != 'ALERTA VALIDADOR NO ENCONTRADO']['nombre_validador'].value_counts().head(5)
-            for nombre, freq in top_validadores.items():
-                print(f"     {nombre}: {freq} registros")
-            
-            if alertas_count > 0:
-                print(f"\n   🚨 ALERTAS:")
-                print(f"     Registros con 'ALERTA VALIDADOR NO ENCONTRADO': {alertas_count}")
-                porcentaje_alerta = (alertas_count / len(df_final)) * 100
-                print(f"     Porcentaje de alertas: {porcentaje_alerta:.2f}%")
+            print(f"\n   Top 10 Validadores:")
+            validadores_top = df_final[df_final['nombre_validador'] != 'ALERTA VALIDADOR NO ENCONTRADO']['nombre_validador'].value_counts().head(10)
+            for i, (nombre, freq) in enumerate(validadores_top.items(), 1):
+                porcentaje = (freq / len(df_final)) * 100
+                usuario = df_final[df_final['nombre_validador'] == nombre]['usuario_validador'].iloc[0]
+                print(f"      {i:2d}. {nombre} ({usuario}): {freq} ({porcentaje:.1f}%)")
         
-        if 'llave' in df_final.columns:
-            print(f"\n🔑 ESTADÍSTICAS DE LLAVES:")
-            llaves_unicas = df_final['llave'].nunique()
-            total_registros = len(df_final)
-            print(f"   Total de llaves únicas: {llaves_unicas}")
-            print(f"   Total de registros: {total_registros}")
-            if llaves_unicas == total_registros:
-                print(f"   ✅ Todas las llaves son únicas")
-            else:
-                print(f"   ⚠ Hay {total_registros - llaves_unicas} llaves duplicadas")
+        print(f"\n🔑 COLUMNAS FINALES ({len(df_final.columns)}):")
+        for i, col in enumerate(df_final.columns, 1):
+            print(f"   {i:2d}. {col}")
         
         print(f"\n✅ PROCESO COMPLETADO EXITOSAMENTE")
-        print(f"   📁 Archivo guardado con {len(df_final.columns)} columnas")
-        print(f"   📊 {len(df_final)} registros procesados")
-        print(f"   🔑 Columna llave creada exitosamente (SIN barras, CON prefijo K)")
-        print(f"   👤 Columna nombre_validador agregada exitosamente")
-        print(f"   📋 Columnas sub_tipo y fse agregadas exitosamente")
+        print(f"   📁 Archivo: {archivo_salida}")
+        print(f"   📊 Registros: {len(df_final)}")
+        print(f"   🔑 Llaves únicas: {df_final['llave'].nunique()}")
+        print(f"   👤 Validadores identificados: {(df_final['nombre_validador'] != 'ALERTA VALIDADOR NO ENCONTRADO').sum()}")
+        print(f"   📋 Sub_tipos identificados: {(df_final['sub_tipo'] != 'ALERTA SUB_TIPO NO ENCONTRADO').sum()}")
+        
         return df_final
         
     except Exception as e:
@@ -535,59 +655,57 @@ def procesar_archivo_ausentismos():
         traceback.print_exc()
         return None
 
-def diagnostico_archivo():
-    """
-    Función de diagnóstico para entender la estructura del archivo
-    """
-    print("=== DIAGNÓSTICO DEL ARCHIVO ===")
+# ============================================================================
+# FUNCIÓN DE DIAGNÓSTICO
+# ============================================================================
+def diagnostico_archivos():
+    """Función de diagnóstico para entender la estructura de ambos archivos"""
+    print("="*80)
+    print("=== DIAGNÓSTICO DE ARCHIVOS ===")
+    print("="*80)
     
-    with open(ruta_entrada, 'r', encoding='utf-8') as file:
-        for i in range(5):
-            linea = file.readline().strip()
-            print(f"Línea {i}: {linea[:100]}...")
+    print("\n[1] DIAGNÓSTICO CSV:")
+    try:
+        with open(ruta_entrada_csv, 'r', encoding='utf-8') as file:
+            for i in range(5):
+                linea = file.readline().strip()
+                print(f"   Línea {i}: {linea[:100]}...")
+    except Exception as e:
+        print(f"   ❌ Error leyendo CSV: {e}")
     
-    print("\nProbando diferentes configuraciones:")
-    
-    configs = [
-        {"skiprows": 0, "desc": "Sin skiprows"},
-        {"skiprows": 1, "desc": "Skiprows=1"},
-        {"skiprows": 2, "desc": "Skiprows=2"},
-    ]
-    
-    for config in configs:
-        try:
-            df_test = pd.read_csv(ruta_entrada, nrows=2, encoding='utf-8', **{k:v for k,v in config.items() if k != 'desc'})
-            print(f"{config['desc']}: {df_test.shape[1]} columnas, primera columna: {df_test.columns[0]}")
-        except Exception as e:
-            print(f"{config['desc']}: Error - {e}")
+    print("\n[2] DIAGNÓSTICO EXCEL:")
+    try:
+        df_excel_test = pd.read_excel(ruta_entrada_excel, nrows=3, dtype=str)
+        print(f"   ✓ Shape: {df_excel_test.shape}")
+        print(f"   ✓ Columnas: {list(df_excel_test.columns)}")
+        print(f"\n   Primeras 3 filas:")
+        print(df_excel_test.to_string(index=False))
+    except Exception as e:
+        print(f"   ❌ Error leyendo Excel: {e}")
 
+# ============================================================================
+# EJECUCIÓN PRINCIPAL
+# ============================================================================
 if __name__ == "__main__":
-    diagnostico_archivo()
+    # Ejecutar diagnóstico primero (opcional)
+    diagnostico_archivos()
     
-    print("\n" + "="*50)
+    print("\n" + "="*80)
+    print("INICIANDO PROCESAMIENTO PRINCIPAL...")
+    print("="*80 + "\n")
     
+    # Ejecutar proceso principal
     resultado = procesar_archivo_ausentismos()
     
-    if resultado is not None and 'nombre_validador' in resultado.columns:
-        print("\n" + "="*50)
-        print("=== ANÁLISIS DETALLADO DE NOMBRE_VALIDADOR ===")
-        print(f"\nTotal de registros: {len(resultado)}")
-        
-        registros_con_validador = (resultado['nombre_validador'] != 'ALERTA VALIDADOR NO ENCONTRADO').sum()
-        registros_sin_validador = (resultado['nombre_validador'] == 'ALERTA VALIDADOR NO ENCONTRADO').sum()
-        
-        print(f"Registros con validador identificado: {registros_con_validador}")
-        print(f"Registros con ALERTA: {registros_sin_validador}")
-        print(f"Porcentaje con validador: {(registros_con_validador / len(resultado) * 100):.2f}%")
-        
-        if registros_sin_validador > 0:
-            print(f"\n🚨 ATENCIÓN: {registros_sin_validador} registros tienen 'ALERTA VALIDADOR NO ENCONTRADO'")
-            print("   Estos registros requieren revisión manual.")
-        
-        print("\n📋 Top 10 validadores por frecuencia:")
-        top_validadores = resultado[resultado['nombre_validador'] != 'ALERTA VALIDADOR NO ENCONTRADO']['nombre_validador'].value_counts().head(10)
-        for i, (nombre, cantidad) in enumerate(top_validadores.items(), 1):
-            porcentaje = (cantidad / len(resultado)) * 100
-            print(f"   {i:2d}. {nombre}: {cantidad} registros ({porcentaje:.1f}%)")
-        
-        print("\n✅ Proceso completado. Revisa el archivo de salida para ver todos los datos.")
+    if resultado is not None:
+        print("\n" + "="*80)
+        print("🎉 ¡PROCESO COMPLETADO CON ÉXITO, PARCERO! 🎉")
+        print("="*80)
+        print(f"\n📁 Revisa tu archivo en:")
+        print(f"   {ruta_completa_salida}")
+        print(f"\n📊 Estadísticas rápidas:")
+        print(f"   • Registros totales: {len(resultado)}")
+        print(f"   • Llaves únicas: {resultado['llave'].nunique()}")
+        print(f"   • Columnas: {len(resultado.columns)}")
+    else:
+        print("\n❌ El proceso falló. Revisa los errores arriba.")
