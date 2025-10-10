@@ -3,14 +3,188 @@ import pandas as pd
 from io import BytesIO
 import zipfile
 import os
-import subprocess
 import tempfile
 
-st.set_page_config(page_title="Auditoría Ausentismos", page_icon="📊", layout="wide")
+st.set_page_config(
+    page_title="Auditoría Ausentismos",
+    page_icon="📊",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
+# ============================================================================
+# ESTILOS CSS
+# ============================================================================
+st.markdown("""
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
+    
+    * {
+        font-family: 'Poppins', sans-serif;
+    }
+    
+    .main-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 3rem 2rem;
+        border-radius: 20px;
+        margin-bottom: 2rem;
+        box-shadow: 0 20px 60px rgba(102, 126, 234, 0.3);
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .main-header::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        right: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+        animation: pulse 4s ease-in-out infinite;
+    }
+    
+    @keyframes pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.1); }
+    }
+    
+    .main-header h1 {
+        color: white;
+        margin: 0;
+        font-size: 3rem;
+        font-weight: 700;
+        text-shadow: 2px 2px 8px rgba(0,0,0,0.2);
+        position: relative;
+        z-index: 1;
+    }
+    
+    .main-header p {
+        color: #e0e7ff;
+        margin: 1rem 0 0 0;
+        font-size: 1.3rem;
+        font-weight: 400;
+        position: relative;
+        z-index: 1;
+    }
+    
+    .paso-header {
+        background: linear-gradient(to right, #f8f9fa, #ffffff);
+        padding: 2rem;
+        border-radius: 15px;
+        border-left: 6px solid #667eea;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        margin-bottom: 2rem;
+    }
+    
+    .paso-header h2 {
+        color: #667eea;
+        margin: 0;
+        font-size: 2rem;
+        font-weight: 700;
+    }
+    
+    .paso-header p {
+        color: #666;
+        margin: 0.5rem 0 0 0;
+        font-size: 1.1rem;
+    }
+    
+    .info-card {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        margin: 1rem 0;
+        border-top: 4px solid #667eea;
+    }
+    
+    .metric-container {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 1.5rem;
+        border-radius: 12px;
+        text-align: center;
+        color: white;
+        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+        transition: transform 0.3s ease;
+    }
+    
+    .metric-container:hover {
+        transform: translateY(-5px);
+    }
+    
+    .metric-label {
+        font-size: 0.9rem;
+        opacity: 0.9;
+        margin-bottom: 0.5rem;
+    }
+    
+    .metric-value {
+        font-size: 2.5rem;
+        font-weight: 700;
+    }
+    
+    .success-box {
+        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        color: white;
+        padding: 1.5rem;
+        border-radius: 12px;
+        margin: 1.5rem 0;
+        font-weight: 600;
+        text-align: center;
+        font-size: 1.2rem;
+        box-shadow: 0 8px 25px rgba(17, 153, 142, 0.3);
+    }
+    
+    .warning-box {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        color: white;
+        padding: 1.5rem;
+        border-radius: 12px;
+        margin: 1.5rem 0;
+        font-weight: 600;
+        text-align: center;
+        font-size: 1.1rem;
+        box-shadow: 0 8px 25px rgba(240, 147, 251, 0.3);
+    }
+    
+    .stButton > button {
+        border-radius: 10px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+    }
+    
+    div[data-testid="stMetricValue"] {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: #667eea;
+    }
+    
+    .sidebar .sidebar-content {
+        background: linear-gradient(180deg, #f8f9fa 0%, #ffffff 100%);
+    }
+    
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# ============================================================================
+# INICIALIZACIÓN
+# ============================================================================
 if 'paso_actual' not in st.session_state:
     st.session_state.paso_actual = 1
 
+# ============================================================================
+# FUNCIONES AUXILIARES
+# ============================================================================
 def crear_zip_desde_archivos(archivos_paths):
     """Crea ZIP desde rutas de archivos existentes"""
     zip_buffer = BytesIO()
@@ -20,26 +194,79 @@ def crear_zip_desde_archivos(archivos_paths):
                 zip_file.write(ruta, os.path.basename(ruta))
     return zip_buffer.getvalue()
 
+def mostrar_header_principal():
+    st.markdown("""
+    <div class="main-header">
+        <h1>📊 Auditoría de Ausentismos</h1>
+        <p>Sistema Integrado de Gestión y Validación</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+def mostrar_metricas_custom(metricas):
+    cols = st.columns(len(metricas))
+    for col, metrica in zip(cols, metricas):
+        with col:
+            st.markdown(f"""
+            <div class="metric-container">
+                <div class="metric-label">{metrica['label']}</div>
+                <div class="metric-value">{metrica['value']}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
 # ============================================================================
-# PASO 1: EJECUTA auditoria_ausentismos_part1.py
+# PASO 1: PROCESAMIENTO INICIAL
 # ============================================================================
 def paso1():
-    st.title("📄 PASO 1: Procesamiento Inicial")
-    st.info("Sube CSV + Excel Reporte 45 → Ejecuta part1.py")
+    mostrar_header_principal()
+    
+    st.markdown("""
+    <div class="paso-header">
+        <h2>📄 PASO 1: Procesamiento Inicial</h2>
+        <p>CONCAT de CSV + Excel Reporte 45 con homologación y validaciones</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    with st.expander("ℹ️ ¿Qué hace este paso?", expanded=False):
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("**📥 Archivos de Entrada:**")
+            st.markdown("• CSV de Ausentismos (Success Factors)")
+            st.markdown("• Excel Reporte 45 (SAP)")
+        with col2:
+            st.markdown("**📤 Archivos de Salida:**")
+            st.markdown("• ausentismo_procesado_especifico.csv")
+        
+        st.markdown("---")
+        st.markdown("**🔧 Procesos Ejecutados:**")
+        st.markdown("• Concatenación de CSV + Excel\n• Homologación SSF vs SAP\n• Identificación de validadores\n• Generación de llaves únicas\n• Eliminación de duplicados\n• Clasificación Sub-tipos y FSE")
+    
+    st.markdown('<div class="warning-box">🔴 Este paso requiere 2 archivos</div>', unsafe_allow_html=True)
     
     col1, col2 = st.columns(2)
+    
     with col1:
-        csv_file = st.file_uploader("CSV Ausentismos", type=['csv'], key="csv1")
+        st.markdown("### 📤 Archivo 1")
+        csv_file = st.file_uploader(
+            "CSV de Ausentismos",
+            type=['csv'],
+            key="csv1",
+            help="Archivo exportado desde Success Factors"
+        )
+    
     with col2:
-        excel_file = st.file_uploader("Excel Reporte 45", type=['xlsx', 'xls'], key="excel1")
+        st.markdown("### 📤 Archivo 2")
+        excel_file = st.file_uploader(
+            "Excel Reporte 45",
+            type=['xlsx', 'xls'],
+            key="excel1",
+            help="Reporte 45 exportado desde SAP"
+        )
     
     if csv_file and excel_file:
         try:
-            with st.spinner('⏳ Ejecutando part1.py...'):
-                # Crear carpeta temporal
+            with st.spinner('⏳ Ejecutando auditoria_ausentismos_part1.py...'):
                 temp_dir = tempfile.mkdtemp()
                 
-                # Guardar archivos subidos
                 csv_path = os.path.join(temp_dir, "input.csv")
                 excel_path = os.path.join(temp_dir, "reporte45.xlsx")
                 
@@ -48,31 +275,32 @@ def paso1():
                 with open(excel_path, "wb") as f:
                     f.write(excel_file.getbuffer())
                 
-                # Modificar rutas en part1.py y ejecutar
                 import auditoria_ausentismos_part1 as part1
                 part1.ruta_entrada_csv = csv_path
                 part1.ruta_entrada_excel = excel_path
                 part1.directorio_salida = temp_dir
                 
-                # EJECUTAR
                 df_resultado = part1.procesar_archivo_ausentismos()
                 
                 if df_resultado is not None:
-                    st.success(f"✅ Completado: {len(df_resultado):,} registros")
+                    st.markdown('<div class="success-box">✅ Procesamiento completado exitosamente</div>', unsafe_allow_html=True)
                     
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        st.metric("📊 Registros", f"{len(df_resultado):,}")
-                    with col2:
-                        st.metric("🔑 Llaves", df_resultado['llave'].nunique())
-                    with col3:
-                        st.metric("📋 Columnas", len(df_resultado.columns))
+                    alertas = (df_resultado['nombre_validador'] == 'ALERTA VALIDADOR NO ENCONTRADO').sum()
                     
-                    st.dataframe(df_resultado.head(10), use_container_width=True)
+                    mostrar_metricas_custom([
+                        {'label': '📊 Total Registros', 'value': f"{len(df_resultado):,}"},
+                        {'label': '🔑 Llaves Únicas', 'value': f"{df_resultado['llave'].nunique():,}"},
+                        {'label': '⚠️ Alertas', 'value': alertas},
+                        {'label': '📋 Columnas', 'value': len(df_resultado.columns)}
+                    ])
                     
                     st.markdown("---")
+                    st.markdown("### 👀 Vista Previa de Datos")
+                    st.dataframe(df_resultado.head(10), use_container_width=True, height=400)
                     
-                    # Buscar archivo generado
+                    st.markdown("---")
+                    st.markdown("### 📦 Descargar Resultados")
+                    
                     archivo_salida = os.path.join(temp_dir, "ausentismo_procesado_completo_v2.csv")
                     
                     if os.path.exists(archivo_salida):
@@ -85,42 +313,77 @@ def paso1():
                                 zip_data,
                                 "PASO_1_Procesado.zip",
                                 "application/zip",
-                                use_container_width=True
+                                use_container_width=True,
+                                type="primary"
                             )
                         with col2:
-                            if st.button("▶️ Paso 2", use_container_width=True):
+                            if st.button("▶️ Siguiente", use_container_width=True, type="secondary"):
                                 st.session_state.paso_actual = 2
                                 st.rerun()
-                    else:
-                        st.warning("⚠️ Archivo no encontrado, pero proceso completado")
                 else:
                     st.error("❌ Error en el procesamiento")
         
         except Exception as e:
-            st.error(f"❌ Error: {str(e)}")
-            with st.expander("Ver error completo"):
+            st.error(f"❌ Error durante la ejecución")
+            with st.expander("🔍 Ver detalles del error"):
                 import traceback
                 st.code(traceback.format_exc())
 
 # ============================================================================
-# PASO 2: EJECUTA auditoria_ausentismos_part2.py
+# PASO 2: VALIDACIONES
 # ============================================================================
 def paso2():
-    st.title("🔗 PASO 2: Validaciones y Merge")
-    st.info("Sube CSV Paso 1 + Excel Personal → Ejecuta part2.py")
+    mostrar_header_principal()
+    
+    st.markdown("""
+    <div class="paso-header">
+        <h2>🔗 PASO 2: Validaciones y Merge con Personal</h2>
+        <p>Cruza con datos de personal y ejecuta múltiples validaciones</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    with st.expander("ℹ️ ¿Qué hace este paso?", expanded=False):
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("**📥 Archivos de Entrada:**")
+            st.markdown("• CSV del Paso 1")
+            st.markdown("• Excel de Personal (MD_*.xlsx)")
+        with col2:
+            st.markdown("**📤 Archivos de Salida:**")
+            st.markdown("• relacion_laboral_con_validaciones.csv")
+            st.markdown("• Múltiples archivos Excel de alertas")
+        
+        st.markdown("---")
+        st.markdown("**🔧 Validaciones Ejecutadas:**")
+        st.markdown("• Validación SENA\n• Validación Ley 50\n• Validación de licencias (6 tipos)\n• Incapacidades > 30 días\n• Ausentismos sin pago > 10 días\n• Día de la familia")
+    
+    st.markdown('<div class="warning-box">🔴 Este paso requiere 2 archivos</div>', unsafe_allow_html=True)
     
     col1, col2 = st.columns(2)
+    
     with col1:
-        csv_paso1 = st.file_uploader("CSV del Paso 1", type=['csv'], key="csv2")
+        st.markdown("### 📤 Archivo 1")
+        csv_paso1 = st.file_uploader(
+            "CSV del Paso 1",
+            type=['csv'],
+            key="csv2",
+            help="Archivo ausentismo_procesado_especifico.csv"
+        )
+    
     with col2:
-        excel_personal = st.file_uploader("Excel Personal (MD_*.xlsx)", type=['xlsx', 'xls'], key="excel2")
+        st.markdown("### 📤 Archivo 2")
+        excel_personal = st.file_uploader(
+            "Excel de Personal (MD_*.xlsx)",
+            type=['xlsx', 'xls'],
+            key="excel2",
+            help="Maestro de datos de personal"
+        )
     
     if csv_paso1 and excel_personal:
         try:
-            with st.spinner('⏳ Ejecutando part2.py...'):
+            with st.spinner('⏳ Ejecutando auditoria_ausentismos_part2.py...'):
                 temp_dir = tempfile.mkdtemp()
                 
-                # Guardar archivos
                 csv_path = os.path.join(temp_dir, "ausentismo_procesado_completo_v2.csv")
                 excel_path = os.path.join(temp_dir, "MD_personal.xlsx")
                 
@@ -129,30 +392,16 @@ def paso2():
                 with open(excel_path, "wb") as f:
                     f.write(excel_personal.getbuffer())
                 
-                # Ejecutar lógica de part2 directamente
-                # (Copiar y pegar código de part2 COMPLETO aquí o importarlo)
-                
-                # Por ahora, leer y procesar manualmente
+                # Leer archivos
                 df_ausentismo = pd.read_csv(csv_path, encoding='utf-8-sig')
                 df_personal = pd.read_excel(excel_path)
                 
-                st.info(f"CSV: {len(df_ausentismo):,} | Excel: {len(df_personal):,}")
-                
                 # Buscar columnas
-                col_num_pers = None
-                for col in df_personal.columns:
-                    if 'pers' in col.lower() or 'personal' in col.lower():
-                        col_num_pers = col
-                        break
-                
-                col_relacion = None
-                for col in df_personal.columns:
-                    if 'relaci' in col.lower() and 'labor' in col.lower():
-                        col_relacion = col
-                        break
+                col_num_pers = next((col for col in df_personal.columns if 'pers' in col.lower() or 'personal' in col.lower()), None)
+                col_relacion = next((col for col in df_personal.columns if 'relaci' in col.lower() and 'labor' in col.lower()), None)
                 
                 if not col_num_pers or not col_relacion:
-                    st.error("❌ Columnas no encontradas")
+                    st.error("❌ No se encontraron las columnas necesarias en el archivo de personal")
                     st.stop()
                 
                 # Merge
@@ -186,7 +435,7 @@ def paso2():
                              'Inca. Enfer Gral Integral', 'Prorr Inc/Enf Gral ntegra']
                 df_errores_ley50 = df_ley50[df_ley50['external_name_label'].isin(prohibidos)].copy()
                 
-                # Columnas de validación (las 6)
+                # Columnas de validación
                 df['licencia_paternidad'] = df.apply(
                     lambda r: "Concepto Si Aplica" if r['external_name_label'] == "Licencia Paternidad" and r['calendar_days'] == '14' 
                     else "Concepto No Aplica", axis=1)
@@ -211,28 +460,40 @@ def paso2():
                     lambda r: "Concepto Si Aplica" if r['external_name_label'] == "Lic Jurado Votación" and 
                     pd.to_numeric(r['calendar_days'], errors='coerce') <= 1 else "Concepto No Aplica", axis=1)
                 
-                # Guardar archivo principal
+                # Guardar archivos
                 archivo_principal = os.path.join(temp_dir, "relacion_laboral_con_validaciones.csv")
                 df.to_csv(archivo_principal, index=False, encoding='utf-8-sig')
                 
-                # Guardar excels de errores
                 archivos_generados = [archivo_principal]
                 
+                # Excels de errores
                 if len(df_errores_sena) > 0:
-                    path_sena = os.path.join(temp_dir, "Sena_error_validar.xlsx")
-                    df_errores_sena.to_excel(path_sena, index=False)
-                    archivos_generados.append(path_sena)
+                    path = os.path.join(temp_dir, "Sena_error_validar.xlsx")
+                    df_errores_sena.to_excel(path, index=False)
+                    archivos_generados.append(path)
                 
                 if len(df_errores_ley50) > 0:
-                    path_ley50 = os.path.join(temp_dir, "Ley_50_error_validar.xlsx")
-                    df_errores_ley50.to_excel(path_ley50, index=False)
-                    archivos_generados.append(path_ley50)
+                    path = os.path.join(temp_dir, "Ley_50_error_validar.xlsx")
+                    df_errores_ley50.to_excel(path, index=False)
+                    archivos_generados.append(path)
                 
-                # Alertas adicionales
+                # Alertas de licencias
                 df_alert_pat = df[(df['licencia_paternidad'] == 'Concepto No Aplica') & (df['external_name_label'] == 'Licencia Paternidad')]
                 if len(df_alert_pat) > 0:
                     path = os.path.join(temp_dir, "alerta_licencia_paternidad.xlsx")
                     df_alert_pat.to_excel(path, index=False)
+                    archivos_generados.append(path)
+                
+                df_alert_mat = df[(df['licencia_maternidad'] == 'Concepto No Aplica') & (df['external_name_label'] == 'Licencia Maternidad')]
+                if len(df_alert_mat) > 0:
+                    path = os.path.join(temp_dir, "alerta_licencia_maternidad.xlsx")
+                    df_alert_mat.to_excel(path, index=False)
+                    archivos_generados.append(path)
+                
+                df_alert_luto = df[(df['ley_de_luto'] == 'Concepto No Aplica') & (df['external_name_label'] == 'Ley de luto')]
+                if len(df_alert_luto) > 0:
+                    path = os.path.join(temp_dir, "alerta_ley_de_luto.xlsx")
+                    df_alert_luto.to_excel(path, index=False)
                     archivos_generados.append(path)
                 
                 # Incapacidades > 30 días
@@ -245,20 +506,33 @@ def paso2():
                     df_incap30.to_excel(path, index=False)
                     archivos_generados.append(path)
                 
-                st.success(f"✅ Procesado: {len(df):,} registros")
+                # Día de la familia
+                df_dia_fam = df[(df['external_name_label'] == 'Día de la familia') & 
+                               (pd.to_numeric(df['calendar_days'], errors='coerce') > 1)]
+                if len(df_dia_fam) > 0:
+                    path = os.path.join(temp_dir, "dia_de_la_familia.xlsx")
+                    df_dia_fam.to_excel(path, index=False)
+                    archivos_generados.append(path)
                 
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("📊 Registros", f"{len(df):,}")
-                with col2:
-                    st.metric("🚨 Errores SENA", len(df_errores_sena))
-                with col3:
-                    st.metric("🚨 Errores Ley 50", len(df_errores_ley50))
+                st.markdown('<div class="success-box">✅ Validaciones completadas exitosamente</div>', unsafe_allow_html=True)
                 
-                st.dataframe(df.head(10), use_container_width=True)
+                mostrar_metricas_custom([
+                    {'label': '📊 Total Registros', 'value': f"{len(df):,}"},
+                    {'label': '🚨 Errores SENA', 'value': len(df_errores_sena)},
+                    {'label': '🚨 Errores Ley 50', 'value': len(df_errores_ley50)},
+                    {'label': '📁 Archivos', 'value': len(archivos_generados)}
+                ])
                 
                 st.markdown("---")
-                st.success(f"📦 {len(archivos_generados)} archivo(s) generado(s)")
+                st.markdown("### 👀 Vista Previa de Datos")
+                st.dataframe(df.head(10), use_container_width=True, height=400)
+                
+                st.markdown("---")
+                st.markdown("### 📦 Descargar Resultados")
+                
+                st.success(f"✅ {len(archivos_generados)} archivo(s) generado(s)")
+                for archivo in archivos_generados:
+                    st.markdown(f"• {os.path.basename(archivo)}")
                 
                 zip_data = crear_zip_desde_archivos(archivos_generados)
                 
@@ -269,40 +543,85 @@ def paso2():
                         zip_data,
                         "PASO_2_Validaciones.zip",
                         "application/zip",
-                        use_container_width=True
+                        use_container_width=True,
+                        type="primary"
                     )
                 with col2:
-                    if st.button("▶️ Paso 3", use_container_width=True):
+                    if st.button("▶️ Siguiente", use_container_width=True, type="secondary"):
                         st.session_state.paso_actual = 3
                         st.rerun()
         
         except Exception as e:
-            st.error(f"❌ Error: {str(e)}")
-            with st.expander("Ver error completo"):
+            st.error(f"❌ Error durante la ejecución")
+            with st.expander("🔍 Ver detalles del error"):
                 import traceback
                 st.code(traceback.format_exc())
 
 # ============================================================================
-# PASO 3: EJECUTA auditoria_ausentismos_part3.py  
+# PASO 3: REPORTE 45 Y CIE-10
 # ============================================================================
 def paso3():
-    st.title("🏥 PASO 3: Reporte 45 y CIE-10")
-    st.info("Sube CSV Paso 2 + Reporte 45 + CIE-10 → Ejecuta part3.py")
+    mostrar_header_principal()
+    
+    st.markdown("""
+    <div class="paso-header">
+        <h2>🏥 PASO 3: Merge con Reporte 45 y CIE-10</h2>
+        <p>Enriquecimiento con diagnósticos y clasificación CIE-10</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    with st.expander("ℹ️ ¿Qué hace este paso?", expanded=False):
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("**📥 Archivos de Entrada:**")
+            st.markdown("• CSV del Paso 2")
+            st.markdown("• Excel Reporte 45 (OTRO)")
+            st.markdown("• Excel CIE-10")
+        with col2:
+            st.markdown("**📤 Archivos de Salida:**")
+            st.markdown("• ausentismos_completo_con_cie10.csv")
+            st.markdown("• ALERTA_DIAGNOSTICO.xlsx")
+        
+        st.markdown("---")
+        st.markdown("**🔧 Procesos Ejecutados:**")
+        st.markdown("• Filtro de 17 subtipos específicos\n• Merge con Reporte 45 por llave\n• Validación de diagnósticos requeridos\n• Enriquecimiento con tabla CIE-10\n• Generación de alertas de diagnósticos")
+    
+    st.markdown('<div class="warning-box">🔴 Este paso requiere 3 archivos</div>', unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns(3)
+    
     with col1:
-        csv_paso2 = st.file_uploader("CSV Paso 2", type=['csv'], key="csv3")
+        st.markdown("### 📤 Archivo 1")
+        csv_paso2 = st.file_uploader(
+            "CSV del Paso 2",
+            type=['csv'],
+            key="csv3",
+            help="Archivo relacion_laboral_con_validaciones.csv"
+        )
+    
     with col2:
-        excel_r45 = st.file_uploader("Reporte 45 (Excel)", type=['xlsx', 'xls'], key="excel3")
+        st.markdown("### 📤 Archivo 2")
+        excel_r45 = st.file_uploader(
+            "Excel Reporte 45",
+            type=['xlsx', 'xls'],
+            key="excel3",
+            help="Otro Reporte 45 (diferente al del Paso 1)"
+        )
+    
     with col3:
-        excel_cie10 = st.file_uploader("CIE-10 (Excel)", type=['xlsx', 'xls'], key="excel4")
+        st.markdown("### 📤 Archivo 3")
+        excel_cie10 = st.file_uploader(
+            "Excel CIE-10",
+            type=['xlsx', 'xls'],
+            key="excel4",
+            help="Tabla maestra CIE-10 ajustada"
+        )
     
     if csv_paso2 and excel_r45 and excel_cie10:
         try:
-            with st.spinner('⏳ Ejecutando part3.py...'):
+            with st.spinner('⏳ Ejecutando auditoria_ausentismos_part3.py...'):
                 temp_dir = tempfile.mkdtemp()
                 
-                # Guardar archivos
                 csv_path = os.path.join(temp_dir, "relacion_laboral_con_validaciones.csv")
                 r45_path = os.path.join(temp_dir, "Reporte45.xlsx")
                 cie10_path = os.path.join(temp_dir, "CIE10.xlsx")
@@ -314,85 +633,162 @@ def paso3():
                 with open(cie10_path, "wb") as f:
                     f.write(excel_cie10.getbuffer())
                 
-                # Modificar rutas en part3 y ejecutar
                 import auditoria_ausentismos_part3 as part3
                 part3.ruta_relacion_laboral = csv_path
                 part3.ruta_reporte_45_excel = r45_path
                 part3.ruta_cie10 = cie10_path
                 part3.directorio_salida = temp_dir
                 
-                # EJECUTAR
                 df_resultado = part3.procesar_todo()
                 
                 if df_resultado is not None:
-                    st.success(f"✅ Completado: {len(df_resultado):,} registros")
+                    st.markdown('<div class="success-box">✅ Proceso completado exitosamente</div>', unsafe_allow_html=True)
                     
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        st.metric("📊 Registros", f"{len(df_resultado):,}")
-                    with col2:
-                        alertas = (df_resultado['alerta_diagnostico'] == 'ALERTA DIAGNOSTICO').sum() if 'alerta_diagnostico' in df_resultado.columns else 0
-                        st.metric("🚨 Alertas Diag", alertas)
-                    with col3:
-                        con_cie = df_resultado['cie10_codigo'].notna().sum() if 'cie10_codigo' in df_resultado.columns else 0
-                        st.metric("🏥 Con CIE-10", con_cie)
+                    alertas = (df_resultado['alerta_diagnostico'] == 'ALERTA DIAGNOSTICO').sum() if 'alerta_diagnostico' in df_resultado.columns else 0
+                    con_cie = df_resultado['cie10_codigo'].notna().sum() if 'cie10_codigo' in df_resultado.columns else 0
                     
-                    st.dataframe(df_resultado.head(10), use_container_width=True)
+                    mostrar_metricas_custom([
+                        {'label': '📊 Total Registros', 'value': f"{len(df_resultado):,}"},
+                        {'label': '🚨 Alertas Diagnóstico', 'value': alertas},
+                        {'label': '🏥 Con CIE-10', 'value': con_cie},
+                        {'label': '📋 Columnas', 'value': len(df_resultado.columns)}
+                    ])
                     
                     st.markdown("---")
+                    st.markdown("### 👀 Vista Previa de Datos")
+                    st.dataframe(df_resultado.head(10), use_container_width=True, height=400)
                     
-                    # Buscar archivos generados
+                    st.markdown("---")
+                    st.markdown("### 📦 Descargar Resultados")
+                    
                     archivo_final = os.path.join(temp_dir, "ausentismos_completo_con_cie10.csv")
                     archivo_alertas = os.path.join(temp_dir, "ALERTA_DIAGNOSTICO.xlsx")
                     
                     archivos = [archivo_final]
                     if os.path.exists(archivo_alertas):
                         archivos.append(archivo_alertas)
+                        st.success(f"✅ {len(archivos)} archivo(s) generado(s)")
+                    else:
+                        st.success(f"✅ 1 archivo generado (sin alertas de diagnóstico)")
+                    
+                    for archivo in archivos:
+                        st.markdown(f"• {os.path.basename(archivo)}")
                     
                     zip_data = crear_zip_desde_archivos(archivos)
                     
-                    st.download_button(
-                        f"📥 DESCARGAR ZIP - PASO 3 ({len(archivos)} archivos)",
-                        zip_data,
-                        "PASO_3_CIE10.zip",
-                        "application/zip",
-                        use_container_width=True
-                    )
+                    col1, col2 = st.columns([3, 1])
+                    with col1:
+                        st.download_button(
+                            f"📥 DESCARGAR ZIP - PASO 3 ({len(archivos)} archivos)",
+                            zip_data,
+                            "PASO_3_CIE10.zip",
+                            "application/zip",
+                            use_container_width=True,
+                            type="primary"
+                        )
+                    with col2:
+                        if st.button("🎉 Finalizar", use_container_width=True, type="secondary"):
+                            st.balloons()
+                            st.success("¡Proceso completado!")
                 else:
                     st.error("❌ Error en el procesamiento")
         
         except Exception as e:
-            st.error(f"❌ Error: {str(e)}")
-            with st.expander("Ver error completo"):
+            st.error(f"❌ Error durante la ejecución")
+            with st.expander("🔍 Ver detalles del error"):
                 import traceback
                 st.code(traceback.format_exc())
 
 # ============================================================================
-# SIDEBAR Y MAIN
+# SIDEBAR
 # ============================================================================
 with st.sidebar:
-    st.title("🧭 Navegación")
+    st.markdown("""
+    <div style='text-align: center; padding: 2rem 0;'>
+        <h1 style='color: white; font-size: 2rem; margin: 0;'>🧭</h1>
+        <h2 style='color: white; font-size: 1.5rem; margin: 0.5rem 0;'>Navegación</h2>
+    </div>
+    """, unsafe_allow_html=True)
+    
     st.markdown("---")
     
     progreso = (st.session_state.paso_actual - 1) / 2 * 100
     st.progress(progreso / 100)
-    st.markdown(f"**Progreso:** {progreso:.0f}%")
+    st.markdown(f"<p style='color: white; text-align: center; font-weight: 600;'>Progreso: {progreso:.0f}%</p>", unsafe_allow_html=True)
     
     st.markdown("---")
     
-    if st.button("1️⃣ Paso 1", use_container_width=True):
-        st.session_state.paso_actual = 1
-        st.rerun()
+    # Botones de navegación
+    if st.session_state.paso_actual == 1:
+        st.markdown("""
+        <div style='background: white; padding: 1rem; border-radius: 10px; margin-bottom: 1rem; border-left: 4px solid #667eea;'>
+            <p style='margin: 0; font-weight: 700; color: #667eea;'>📄 PASO 1: Procesamiento ◄</p>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        if st.button("📄 PASO 1: Procesamiento", use_container_width=True, key="nav1"):
+            st.session_state.paso_actual = 1
+            st.rerun()
     
-    if st.button("2️⃣ Paso 2", use_container_width=True):
-        st.session_state.paso_actual = 2
-        st.rerun()
+    if st.session_state.paso_actual == 2:
+        st.markdown("""
+        <div style='background: white; padding: 1rem; border-radius: 10px; margin-bottom: 1rem; border-left: 4px solid #667eea;'>
+            <p style='margin: 0; font-weight: 700; color: #667eea;'>🔗 PASO 2: Validaciones ◄</p>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        if st.button("🔗 PASO 2: Validaciones", use_container_width=True, key="nav2"):
+            st.session_state.paso_actual = 2
+            st.rerun()
     
-    if st.button("3️⃣ Paso 3", use_container_width=True):
-        st.session_state.paso_actual = 3
-        st.rerun()
+    if st.session_state.paso_actual == 3:
+        st.markdown("""
+        <div style='background: white; padding: 1rem; border-radius: 10px; margin-bottom: 1rem; border-left: 4px solid #667eea;'>
+            <p style='margin: 0; font-weight: 700; color: #667eea;'>🏥 PASO 3: CIE-10 ◄</p>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        if st.button("🏥 PASO 3: CIE-10", use_container_width=True, key="nav3"):
+            st.session_state.paso_actual = 3
+            st.rerun()
+    
+    st.markdown("---")
+    
+    st.markdown("""
+    <div style='background: rgba(255,255,255,0.1); padding: 1rem; border-radius: 10px;'>
+        <h3 style='color: white; font-size: 1.2rem; margin: 0 0 1rem 0;'>📋 Flujo del Proceso</h3>
+        <div style='color: white; font-size: 0.9rem; line-height: 1.8;'>
+            <p><strong>PASO 1:</strong> CSV + Excel → Procesado</p>
+            <p><strong>PASO 2:</strong> CSV + Personal → Validaciones</p>
+            <p><strong>PASO 3:</strong> CSV + R45 + CIE-10 → Final</p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("---")
+    
+    st.markdown("""
+    <div style='background: rgba(255,255,255,0.1); padding: 1rem; border-radius: 10px;'>
+        <h3 style='color: white; font-size: 1.2rem; margin: 0 0 1rem 0;'>💡 Información</h3>
+        <p style='color: white; font-size: 0.85rem; line-height: 1.6;'>
+            Sistema que ejecuta scripts Python existentes (part1, part2, part3) 
+            de forma secuencial y descarga los resultados en formato ZIP.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("---")
+    
+    st.markdown("""
+    <div style='text-align: center; padding: 1rem 0;'>
+        <p style='color: white; font-size: 0.9rem; margin: 0;'>📧 <strong>Soporte</strong></p>
+        <p style='color: rgba(255,255,255,0.8); font-size: 0.85rem; margin: 0.5rem 0 0 0;'>Grupo Jerónimo Martins</p>
+    </div>
+    """, unsafe_allow_html=True)
 
-# MAIN
+# ============================================================================
+# MAIN - ENRUTADOR DE PASOS
+# ============================================================================
 if st.session_state.paso_actual == 1:
     paso1()
 elif st.session_state.paso_actual == 2:
