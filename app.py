@@ -252,7 +252,7 @@ def paso2():
     with st.expander("ℹ️ ¿Qué hace este paso?", expanded=False):
         st.write("**📥 Archivos de Entrada:**")
         st.write("• CSV del Paso 1")
-        st.write("• Excel de Personal (MD_*.xlsx)")
+        st.write("• Excel MD")
         
         st.write("**📤 Archivos de Salida:**")
         st.write("• relacion_laboral_con_validaciones.csv")
@@ -278,9 +278,10 @@ def paso2():
     with col2:
         st.subheader("📤 Archivo 2")
         excel_personal = st.file_uploader(
-            "Excel de Personal",
+            "Excel MD",
             type=['xlsx', 'xls'],
-            key="excel2"
+            key="excel2",
+            help="Archivo MD_*.xlsx con datos de personal"
         )
     
     if csv_paso1 and excel_personal:
