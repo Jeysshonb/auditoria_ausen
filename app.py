@@ -252,7 +252,7 @@ def paso2():
     with st.expander("ℹ️ ¿Qué hace este paso?", expanded=False):
         st.write("**📥 Archivos de Entrada:**")
         st.write("• CSV del Paso 1")
-        st.write("• Excel MD (MD_*.xlsx)")
+        st.write("• Excel de Personal (MD_*.xlsx)")
         
         st.write("**📤 Archivos de Salida:**")
         st.write("• relacion_laboral_con_validaciones.csv")
@@ -278,7 +278,7 @@ def paso2():
     with col2:
         st.subheader("📤 Archivo 2")
         excel_personal = st.file_uploader(
-            "Excel MD",
+            "Excel de Personal",
             type=['xlsx', 'xls'],
             key="excel2"
         )
@@ -338,33 +338,119 @@ def paso2():
                                  'Inca. Enfer Gral Integral', 'Prorr Inc/Enf Gral ntegra']
                     df_errores_ley50 = df_ley50[df_ley50['external_name_label'].isin(prohibidos)].copy()
                     
+                    # Convertir calendar_days y quantity_in_days a numérico
+                    df['calendar_days'] = pd.to_numeric(df['calendar_days'], errors='coerce')
+                    df['quantity_in_days'] = pd.to_numeric(df['quantity_in_days'], errors='coerce')
+                    
                     # Columnas de validación
                     df['licencia_paternidad'] = df.apply(
-                        lambda r: "Concepto Si Aplica" if r['external_name_label'] == "Licencia Paternidad" and r['calendar_days'] == '14' 
+                        lambda r: "Concepto Si Aplica" if r['external_name_label'] == "Licencia Paternidad" and r['calendar_days'] == 14 
                         else "Concepto No Aplica", axis=1)
                     
                     df['licencia_maternidad'] = df.apply(
-                        lambda r: "Concepto Si Aplica" if r['external_name_label'] == "Licencia Maternidad" and r['calendar_days'] == '126' 
+                        lambda r: "Concepto Si Aplica" if r['external_name_label'] == "Licencia Maternidad" and r['calendar_days'] == 126 
                         else "Concepto No Aplica", axis=1)
                     
                     df['ley_de_luto'] = df.apply(
-                        lambda r: "Concepto Si Aplica" if r['external_name_label'] == "Ley de luto" and r['quantity_in_days'] == '5' 
+                        lambda r: "Concepto Si Aplica" if r['external_name_label'] == "Ley de luto" and r['quantity_in_days'] == 5 
                         else "Concepto No Aplica", axis=1)
                     
-                    # Guardar archivos
+                    df['incap_fuera_de_turno'] = df.apply(
+                        lambda r: "Concepto Si Aplica" if r['external_name_label'] == "Incapa.fuera de turno" and r['calendar_days'] <= 1 
+                        else "Concepto No Aplica", axis=1)
+                    
+                    df['lic_maternidad_sena'] = df.apply(
+                        lambda r: "Concepto Si Aplica" if r['external_name_label'] == "Licencia de Maternidad SENA" and r['calendar_days'] == 126 
+                        else "Concepto No Aplica", axis=1)
+                    
+                    df['lic_jurado_votacion'] = df.apply(
+                        lambda r: "Concepto Si Aplica" if r['external_name_label'] == "Lic Jurado Votación" and r['calendar_days'] <= 1 
+                        else "Concepto No Aplica", axis=1)
+                    
+                    # Guardar archivo principal
                     archivo_principal = os.path.join(temp_dir, "relacion_laboral_con_validaciones.csv")
                     df.to_csv(archivo_principal, index=False, encoding='utf-8-sig')
                     
                     archivos_generados = [archivo_principal]
                     
+                    # Errores SENA
                     if len(df_errores_sena) > 0:
                         path = os.path.join(temp_dir, "Sena_error_validar.xlsx")
                         df_errores_sena.to_excel(path, index=False)
                         archivos_generados.append(path)
                     
+                    # Errores Ley 50
                     if len(df_errores_ley50) > 0:
                         path = os.path.join(temp_dir, "Ley_50_error_validar.xlsx")
                         df_errores_ley50.to_excel(path, index=False)
+                        archivos_generados.append(path)
+                    
+                    # ===== ALERTAS POR COLUMNA =====
+                    
+                    # 1. Alerta licencia_paternidad
+                    df_alert_pat = df[(df['licencia_paternidad'] == 'Concepto No Aplica') & (df['external_name_label'] == 'Licencia Paternidad')]
+                    if len(df_alert_pat) > 0:
+                        path = os.path.join(temp_dir, "alerta_licencia_paternidad.xlsx")
+                        df_alert_pat.to_excel(path, index=False)
+                        archivos_generados.append(path)
+                    
+                    # 2. Alerta licencia_maternidad
+                    df_alert_mat = df[(df['licencia_maternidad'] == 'Concepto No Aplica') & (df['external_name_label'] == 'Licencia Maternidad')]
+                    if len(df_alert_mat) > 0:
+                        path = os.path.join(temp_dir, "alerta_licencia_maternidad.xlsx")
+                        df_alert_mat.to_excel(path, index=False)
+                        archivos_generados.append(path)
+                    
+                    # 3. Alerta ley_de_luto
+                    df_alert_luto = df[(df['ley_de_luto'] == 'Concepto No Aplica') & (df['external_name_label'] == 'Ley de luto')]
+                    if len(df_alert_luto) > 0:
+                        path = os.path.join(temp_dir, "alerta_ley_de_luto.xlsx")
+                        df_alert_luto.to_excel(path, index=False)
+                        archivos_generados.append(path)
+                    
+                    # 4. Alerta incap_fuera_de_turno
+                    df_alert_incap = df[(df['incap_fuera_de_turno'] == 'Concepto No Aplica') & (df['external_name_label'] == 'Incapa.fuera de turno')]
+                    if len(df_alert_incap) > 0:
+                        path = os.path.join(temp_dir, "alerta_incap_fuera_de_turno.xlsx")
+                        df_alert_incap.to_excel(path, index=False)
+                        archivos_generados.append(path)
+                    
+                    # 5. Alerta lic_maternidad_sena
+                    df_alert_mat_sena = df[(df['lic_maternidad_sena'] == 'Concepto No Aplica') & (df['external_name_label'] == 'Licencia de Maternidad SENA')]
+                    if len(df_alert_mat_sena) > 0:
+                        path = os.path.join(temp_dir, "alerta_lic_maternidad_sena.xlsx")
+                        df_alert_mat_sena.to_excel(path, index=False)
+                        archivos_generados.append(path)
+                    
+                    # 6. Alerta lic_jurado_votacion
+                    df_alert_jurado = df[(df['lic_jurado_votacion'] == 'Concepto No Aplica') & (df['external_name_label'] == 'Lic Jurado Votación')]
+                    if len(df_alert_jurado) > 0:
+                        path = os.path.join(temp_dir, "alerta_lic_jurado_votacion.xlsx")
+                        df_alert_jurado.to_excel(path, index=False)
+                        archivos_generados.append(path)
+                    
+                    # 7. Incapacidades > 30 días
+                    conceptos_incap = ['Incapacidad enfermedad general', 'Prorroga Inca/Enfer Gene', 'Enf Gral SOAT', 
+                                      'Inc. Accidente de Trabajo', 'Prorroga Inc. Accid. Trab']
+                    df_incap30 = df[(df['external_name_label'].isin(conceptos_incap)) & (df['calendar_days'] > 30)]
+                    if len(df_incap30) > 0:
+                        path = os.path.join(temp_dir, "incp_mayor_30_dias.xlsx")
+                        df_incap30.to_excel(path, index=False)
+                        archivos_generados.append(path)
+                    
+                    # 8. Ausentismos sin pago > 10 días
+                    conceptos_sin_pago = ['Aus Reg sin Soporte', 'Suspensión']
+                    df_sin_pago = df[(df['external_name_label'].isin(conceptos_sin_pago)) & (df['calendar_days'] > 10)]
+                    if len(df_sin_pago) > 0:
+                        path = os.path.join(temp_dir, "Validacion_ausentismos_sin_pago_mayor_10_dias.xlsx")
+                        df_sin_pago.to_excel(path, index=False)
+                        archivos_generados.append(path)
+                    
+                    # 9. Día de la familia > 1 día
+                    df_dia_fam = df[(df['external_name_label'] == 'Día de la familia') & (df['calendar_days'] > 1)]
+                    if len(df_dia_fam) > 0:
+                        path = os.path.join(temp_dir, "dia_de_la_familia.xlsx")
+                        df_dia_fam.to_excel(path, index=False)
                         archivos_generados.append(path)
                     
                     st.success("✅ Validaciones completadas")
