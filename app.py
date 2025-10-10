@@ -260,7 +260,27 @@ def paso1():
                     st.success("✅ Rutas configuradas")
                     
                     st.info("🔍 DEBUG: Ejecutando procesar_archivo_ausentismos()...")
-                    df_resultado = part1.procesar_archivo_ausentismos()
+                    
+                    # Capturar output del script
+                    import sys
+                    from io import StringIO
+                    
+                    old_stdout = sys.stdout
+                    sys.stdout = StringIO()
+                    
+                    try:
+                        df_resultado = part1.procesar_archivo_ausentismos()
+                        output = sys.stdout.getvalue()
+                    finally:
+                        sys.stdout = old_stdout
+                    
+                    # Mostrar output del script
+                    if output:
+                        with st.expander("📋 Output del Script part1.py", expanded=True):
+                            st.code(output)
+                    
+                    st.info(f"🔍 DEBUG: df_resultado type: {type(df_resultado)}")
+                    st.info(f"🔍 DEBUG: df_resultado is None: {df_resultado is None}")
                     
                     if df_resultado is not None:
                         st.success(f"✅ Resultado obtenido: {len(df_resultado)} registros")
