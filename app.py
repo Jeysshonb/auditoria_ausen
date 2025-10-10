@@ -232,24 +232,39 @@ def paso1():
         if st.button("🚀 PROCESAR ARCHIVOS", use_container_width=True, type="primary"):
             try:
                 with st.spinner('⏳ Ejecutando auditoria_ausentismos_part1.py...'):
+                    st.info("🔍 DEBUG: Iniciando procesamiento...")
+                    
                     temp_dir = tempfile.mkdtemp()
+                    st.info(f"🔍 DEBUG: Directorio temporal creado: {temp_dir}")
                     
                     csv_path = os.path.join(temp_dir, "input.csv")
                     excel_path = os.path.join(temp_dir, "reporte45.xlsx")
                     
+                    st.info("🔍 DEBUG: Guardando archivos subidos...")
                     with open(csv_path, "wb") as f:
                         f.write(csv_file.getbuffer())
+                    st.success(f"✅ CSV guardado: {csv_path}")
+                    
                     with open(excel_path, "wb") as f:
                         f.write(excel_file.getbuffer())
+                    st.success(f"✅ Excel guardado: {excel_path}")
                     
+                    st.info("🔍 DEBUG: Importando módulo part1...")
                     import auditoria_ausentismos_part1 as part1
+                    st.success("✅ Módulo part1 importado")
+                    
+                    st.info("🔍 DEBUG: Configurando rutas en part1...")
                     part1.ruta_entrada_csv = csv_path
                     part1.ruta_entrada_excel = excel_path
                     part1.directorio_salida = temp_dir
+                    st.success("✅ Rutas configuradas")
                     
+                    st.info("🔍 DEBUG: Ejecutando procesar_archivo_ausentismos()...")
                     df_resultado = part1.procesar_archivo_ausentismos()
                     
                     if df_resultado is not None:
+                        st.success(f"✅ Resultado obtenido: {len(df_resultado)} registros")
+                        
                         st.markdown('<div class="success-box">✅ Procesamiento completado exitosamente</div>', unsafe_allow_html=True)
                         
                         alertas = (df_resultado['nombre_validador'] == 'ALERTA VALIDADOR NO ENCONTRADO').sum()
@@ -270,7 +285,11 @@ def paso1():
                         
                         archivo_salida = os.path.join(temp_dir, "ausentismo_procesado_completo_v2.csv")
                         
+                        st.info(f"🔍 DEBUG: Buscando archivo: {archivo_salida}")
+                        st.info(f"🔍 DEBUG: Archivos en directorio: {os.listdir(temp_dir)}")
+                        
                         if os.path.exists(archivo_salida):
+                            st.success(f"✅ Archivo encontrado: {archivo_salida}")
                             zip_data = crear_zip_desde_archivos([archivo_salida])
                             
                             col1, col2 = st.columns([3, 1])
@@ -287,14 +306,29 @@ def paso1():
                                 if st.button("▶️ Siguiente", use_container_width=True, type="secondary"):
                                     st.session_state.paso_actual = 2
                                     st.rerun()
+                        else:
+                            st.warning(f"⚠️ Archivo esperado no encontrado: {archivo_salida}")
+                            st.info("Pero el procesamiento se completó. Revisa los archivos disponibles.")
                     else:
-                        st.error("❌ Error en el procesamiento")
+                        st.error("❌ df_resultado es None - El procesamiento falló")
             
             except Exception as e:
-                st.error(f"❌ Error durante la ejecución")
-                with st.expander("🔍 Ver detalles del error"):
+                st.error(f"❌ ERROR CAPTURADO: {type(e).__name__}")
+                st.error(f"❌ Mensaje: {str(e)}")
+                
+                with st.expander("🔍 Ver Stack Trace Completo", expanded=True):
                     import traceback
-                    st.code(traceback.format_exc())
+                    error_completo = traceback.format_exc()
+                    st.code(error_completo, language="python")
+                    
+                with st.expander("📋 Información de Debug"):
+                    st.write("**Variables disponibles:**")
+                    try:
+                        st.write(f"- csv_file: {csv_file.name if csv_file else 'No disponible'}")
+                        st.write(f"- excel_file: {excel_file.name if excel_file else 'No disponible'}")
+                        st.write(f"- temp_dir: {temp_dir if 'temp_dir' in locals() else 'No creado'}")
+                    except:
+                        st.write("No se pudieron obtener las variables")
 
 # ============================================================================
 # PASO 2: VALIDACIONES
