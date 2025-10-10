@@ -227,71 +227,74 @@ def paso1():
         )
     
     if csv_file and excel_file:
-        try:
-            with st.spinner('⏳ Ejecutando auditoria_ausentismos_part1.py...'):
-                temp_dir = tempfile.mkdtemp()
-                
-                csv_path = os.path.join(temp_dir, "input.csv")
-                excel_path = os.path.join(temp_dir, "reporte45.xlsx")
-                
-                with open(csv_path, "wb") as f:
-                    f.write(csv_file.getbuffer())
-                with open(excel_path, "wb") as f:
-                    f.write(excel_file.getbuffer())
-                
-                import auditoria_ausentismos_part1 as part1
-                part1.ruta_entrada_csv = csv_path
-                part1.ruta_entrada_excel = excel_path
-                part1.directorio_salida = temp_dir
-                
-                df_resultado = part1.procesar_archivo_ausentismos()
-                
-                if df_resultado is not None:
-                    st.markdown('<div class="success-box">✅ Procesamiento completado exitosamente</div>', unsafe_allow_html=True)
-                    
-                    alertas = (df_resultado['nombre_validador'] == 'ALERTA VALIDADOR NO ENCONTRADO').sum()
-                    
-                    mostrar_metricas_custom([
-                        {'label': '📊 Total Registros', 'value': f"{len(df_resultado):,}"},
-                        {'label': '🔑 Llaves Únicas', 'value': f"{df_resultado['llave'].nunique():,}"},
-                        {'label': '⚠️ Alertas', 'value': alertas},
-                        {'label': '📋 Columnas', 'value': len(df_resultado.columns)}
-                    ])
-                    
-                    st.markdown("---")
-                    st.markdown("### 👀 Vista Previa de Datos")
-                    st.dataframe(df_resultado.head(10), use_container_width=True, height=400)
-                    
-                    st.markdown("---")
-                    st.markdown("### 📦 Descargar Resultados")
-                    
-                    archivo_salida = os.path.join(temp_dir, "ausentismo_procesado_completo_v2.csv")
-                    
-                    if os.path.exists(archivo_salida):
-                        zip_data = crear_zip_desde_archivos([archivo_salida])
-                        
-                        col1, col2 = st.columns([3, 1])
-                        with col1:
-                            st.download_button(
-                                "📥 DESCARGAR ZIP - PASO 1",
-                                zip_data,
-                                "PASO_1_Procesado.zip",
-                                "application/zip",
-                                use_container_width=True,
-                                type="primary"
-                            )
-                        with col2:
-                            if st.button("▶️ Siguiente", use_container_width=True, type="secondary"):
-                                st.session_state.paso_actual = 2
-                                st.rerun()
-                else:
-                    st.error("❌ Error en el procesamiento")
+        st.markdown("---")
         
-        except Exception as e:
-            st.error(f"❌ Error durante la ejecución")
-            with st.expander("🔍 Ver detalles del error"):
-                import traceback
-                st.code(traceback.format_exc())
+        if st.button("🚀 PROCESAR ARCHIVOS", use_container_width=True, type="primary"):
+            try:
+                with st.spinner('⏳ Ejecutando auditoria_ausentismos_part1.py...'):
+                    temp_dir = tempfile.mkdtemp()
+                    
+                    csv_path = os.path.join(temp_dir, "input.csv")
+                    excel_path = os.path.join(temp_dir, "reporte45.xlsx")
+                    
+                    with open(csv_path, "wb") as f:
+                        f.write(csv_file.getbuffer())
+                    with open(excel_path, "wb") as f:
+                        f.write(excel_file.getbuffer())
+                    
+                    import auditoria_ausentismos_part1 as part1
+                    part1.ruta_entrada_csv = csv_path
+                    part1.ruta_entrada_excel = excel_path
+                    part1.directorio_salida = temp_dir
+                    
+                    df_resultado = part1.procesar_archivo_ausentismos()
+                    
+                    if df_resultado is not None:
+                        st.markdown('<div class="success-box">✅ Procesamiento completado exitosamente</div>', unsafe_allow_html=True)
+                        
+                        alertas = (df_resultado['nombre_validador'] == 'ALERTA VALIDADOR NO ENCONTRADO').sum()
+                        
+                        mostrar_metricas_custom([
+                            {'label': '📊 Total Registros', 'value': f"{len(df_resultado):,}"},
+                            {'label': '🔑 Llaves Únicas', 'value': f"{df_resultado['llave'].nunique():,}"},
+                            {'label': '⚠️ Alertas', 'value': alertas},
+                            {'label': '📋 Columnas', 'value': len(df_resultado.columns)}
+                        ])
+                        
+                        st.markdown("---")
+                        st.markdown("### 👀 Vista Previa de Datos")
+                        st.dataframe(df_resultado.head(10), use_container_width=True, height=400)
+                        
+                        st.markdown("---")
+                        st.markdown("### 📦 Descargar Resultados")
+                        
+                        archivo_salida = os.path.join(temp_dir, "ausentismo_procesado_completo_v2.csv")
+                        
+                        if os.path.exists(archivo_salida):
+                            zip_data = crear_zip_desde_archivos([archivo_salida])
+                            
+                            col1, col2 = st.columns([3, 1])
+                            with col1:
+                                st.download_button(
+                                    "📥 DESCARGAR ZIP - PASO 1",
+                                    zip_data,
+                                    "PASO_1_Procesado.zip",
+                                    "application/zip",
+                                    use_container_width=True,
+                                    type="primary"
+                                )
+                            with col2:
+                                if st.button("▶️ Siguiente", use_container_width=True, type="secondary"):
+                                    st.session_state.paso_actual = 2
+                                    st.rerun()
+                    else:
+                        st.error("❌ Error en el procesamiento")
+            
+            except Exception as e:
+                st.error(f"❌ Error durante la ejecución")
+                with st.expander("🔍 Ver detalles del error"):
+                    import traceback
+                    st.code(traceback.format_exc())
 
 # ============================================================================
 # PASO 2: VALIDACIONES
@@ -344,8 +347,11 @@ def paso2():
         )
     
     if csv_paso1 and excel_personal:
-        try:
-            with st.spinner('⏳ Ejecutando auditoria_ausentismos_part2.py...'):
+        st.markdown("---")
+        
+        if st.button("🚀 PROCESAR ARCHIVOS", use_container_width=True, type="primary", key="procesar_paso2"):
+            try:
+                with st.spinner('⏳ Ejecutando auditoria_ausentismos_part2.py...'):
                 temp_dir = tempfile.mkdtemp()
                 
                 csv_path = os.path.join(temp_dir, "ausentismo_procesado_completo_v2.csv")
@@ -582,8 +588,11 @@ def paso3():
         )
     
     if csv_paso2 and excel_r45 and excel_cie10:
-        try:
-            with st.spinner('⏳ Ejecutando auditoria_ausentismos_part3.py...'):
+        st.markdown("---")
+        
+        if st.button("🚀 PROCESAR ARCHIVOS", use_container_width=True, type="primary", key="procesar_paso3"):
+            try:
+                with st.spinner('⏳ Ejecutando auditoria_ausentismos_part3.py...'):
                 temp_dir = tempfile.mkdtemp()
                 
                 csv_path = os.path.join(temp_dir, "relacion_laboral_con_validaciones.csv")
@@ -657,11 +666,11 @@ def paso3():
                 else:
                     st.error("❌ Error en el procesamiento")
         
-        except Exception as e:
-            st.error(f"❌ Error durante la ejecución")
-            with st.expander("🔍 Ver detalles del error"):
-                import traceback
-                st.code(traceback.format_exc())
+            except Exception as e:
+                st.error(f"❌ Error durante la ejecución")
+                with st.expander("🔍 Ver detalles del error"):
+                    import traceback
+                    st.code(traceback.format_exc())
 
 # ============================================================================
 # SIDEBAR
