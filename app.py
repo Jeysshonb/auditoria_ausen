@@ -243,6 +243,9 @@ def paso1():
                         f.write(excel_file.getbuffer())
                     
                     import auditoria_ausentismos_part1 as part1
+                    import importlib
+                    importlib.reload(part1)  # Recargar el módulo
+                    
                     part1.ruta_entrada_csv = csv_path
                     part1.ruta_entrada_excel = excel_path
                     part1.directorio_salida = temp_dir
