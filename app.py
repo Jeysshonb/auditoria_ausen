@@ -352,180 +352,180 @@ def paso2():
         if st.button("🚀 PROCESAR ARCHIVOS", use_container_width=True, type="primary", key="procesar_paso2"):
             try:
                 with st.spinner('⏳ Ejecutando auditoria_ausentismos_part2.py...'):
-                temp_dir = tempfile.mkdtemp()
-                
-                csv_path = os.path.join(temp_dir, "ausentismo_procesado_completo_v2.csv")
-                excel_path = os.path.join(temp_dir, "MD_personal.xlsx")
-                
-                with open(csv_path, "wb") as f:
-                    f.write(csv_paso1.getbuffer())
-                with open(excel_path, "wb") as f:
-                    f.write(excel_personal.getbuffer())
-                
-                # Leer archivos
-                df_ausentismo = pd.read_csv(csv_path, encoding='utf-8-sig')
-                df_personal = pd.read_excel(excel_path)
-                
-                # Buscar columnas
-                col_num_pers = next((col for col in df_personal.columns if 'pers' in col.lower() or 'personal' in col.lower()), None)
-                col_relacion = next((col for col in df_personal.columns if 'relaci' in col.lower() and 'labor' in col.lower()), None)
-                
-                if not col_num_pers or not col_relacion:
-                    st.error("❌ No se encontraron las columnas necesarias en el archivo de personal")
-                    st.stop()
-                
-                # Merge
-                df_ausentismo['id_personal'] = df_ausentismo['id_personal'].astype(str).str.strip()
-                df_personal[col_num_pers] = df_personal[col_num_pers].astype(str).str.strip()
-                
-                df = pd.merge(
-                    df_ausentismo,
-                    df_personal[[col_num_pers, col_relacion]],
-                    left_on='id_personal',
-                    right_on=col_num_pers,
-                    how='left'
-                )
-                
-                if col_relacion != 'Relación laboral':
-                    df.rename(columns={col_relacion: 'Relación laboral'}, inplace=True)
-                
-                if col_num_pers != 'id_personal' and col_num_pers in df.columns:
-                    df.drop(columns=[col_num_pers], inplace=True)
-                
-                df = df[df['Relación laboral'].notna()]
-                
-                # Validaciones SENA
-                df_aprendizaje = df[df['Relación laboral'].str.contains('Aprendizaje', case=False, na=False)].copy()
-                conceptos_validos = ['Incapacidad gral SENA', 'Licencia de Maternidad SENA', 'Suspensión contrato SENA']
-                df_errores_sena = df_aprendizaje[~df_aprendizaje['external_name_label'].isin(conceptos_validos)].copy()
-                
-                # Validaciones Ley 50
-                df_ley50 = df[df['Relación laboral'].str.contains('Ley 50', case=False, na=False)].copy()
-                prohibidos = ['Incapacidad gral SENA', 'Licencia de Maternidad SENA', 'Suspensión contrato SENA',
-                             'Inca. Enfer Gral Integral', 'Prorr Inc/Enf Gral ntegra']
-                df_errores_ley50 = df_ley50[df_ley50['external_name_label'].isin(prohibidos)].copy()
-                
-                # Columnas de validación
-                df['licencia_paternidad'] = df.apply(
-                    lambda r: "Concepto Si Aplica" if r['external_name_label'] == "Licencia Paternidad" and r['calendar_days'] == '14' 
-                    else "Concepto No Aplica", axis=1)
-                
-                df['licencia_maternidad'] = df.apply(
-                    lambda r: "Concepto Si Aplica" if r['external_name_label'] == "Licencia Maternidad" and r['calendar_days'] == '126' 
-                    else "Concepto No Aplica", axis=1)
-                
-                df['ley_de_luto'] = df.apply(
-                    lambda r: "Concepto Si Aplica" if r['external_name_label'] == "Ley de luto" and r['quantity_in_days'] == '5' 
-                    else "Concepto No Aplica", axis=1)
-                
-                df['incap_fuera_de_turno'] = df.apply(
-                    lambda r: "Concepto Si Aplica" if r['external_name_label'] == "Incapa.fuera de turno" and 
-                    pd.to_numeric(r['calendar_days'], errors='coerce') <= 1 else "Concepto No Aplica", axis=1)
-                
-                df['lic_maternidad_sena'] = df.apply(
-                    lambda r: "Concepto Si Aplica" if r['external_name_label'] == "Licencia de Maternidad SENA" and r['calendar_days'] == '126' 
-                    else "Concepto No Aplica", axis=1)
-                
-                df['lic_jurado_votacion'] = df.apply(
-                    lambda r: "Concepto Si Aplica" if r['external_name_label'] == "Lic Jurado Votación" and 
-                    pd.to_numeric(r['calendar_days'], errors='coerce') <= 1 else "Concepto No Aplica", axis=1)
-                
-                # Guardar archivos
-                archivo_principal = os.path.join(temp_dir, "relacion_laboral_con_validaciones.csv")
-                df.to_csv(archivo_principal, index=False, encoding='utf-8-sig')
-                
-                archivos_generados = [archivo_principal]
-                
-                # Excels de errores
-                if len(df_errores_sena) > 0:
-                    path = os.path.join(temp_dir, "Sena_error_validar.xlsx")
-                    df_errores_sena.to_excel(path, index=False)
-                    archivos_generados.append(path)
-                
-                if len(df_errores_ley50) > 0:
-                    path = os.path.join(temp_dir, "Ley_50_error_validar.xlsx")
-                    df_errores_ley50.to_excel(path, index=False)
-                    archivos_generados.append(path)
-                
-                # Alertas de licencias
-                df_alert_pat = df[(df['licencia_paternidad'] == 'Concepto No Aplica') & (df['external_name_label'] == 'Licencia Paternidad')]
-                if len(df_alert_pat) > 0:
-                    path = os.path.join(temp_dir, "alerta_licencia_paternidad.xlsx")
-                    df_alert_pat.to_excel(path, index=False)
-                    archivos_generados.append(path)
-                
-                df_alert_mat = df[(df['licencia_maternidad'] == 'Concepto No Aplica') & (df['external_name_label'] == 'Licencia Maternidad')]
-                if len(df_alert_mat) > 0:
-                    path = os.path.join(temp_dir, "alerta_licencia_maternidad.xlsx")
-                    df_alert_mat.to_excel(path, index=False)
-                    archivos_generados.append(path)
-                
-                df_alert_luto = df[(df['ley_de_luto'] == 'Concepto No Aplica') & (df['external_name_label'] == 'Ley de luto')]
-                if len(df_alert_luto) > 0:
-                    path = os.path.join(temp_dir, "alerta_ley_de_luto.xlsx")
-                    df_alert_luto.to_excel(path, index=False)
-                    archivos_generados.append(path)
-                
-                # Incapacidades > 30 días
-                conceptos_incap = ['Incapacidad enfermedad general', 'Prorroga Inca/Enfer Gene', 'Enf Gral SOAT', 
-                                  'Inc. Accidente de Trabajo', 'Prorroga Inc. Accid. Trab']
-                df_incap30 = df[(df['external_name_label'].isin(conceptos_incap)) & 
-                               (pd.to_numeric(df['calendar_days'], errors='coerce') > 30)]
-                if len(df_incap30) > 0:
-                    path = os.path.join(temp_dir, "incp_mayor_30_dias.xlsx")
-                    df_incap30.to_excel(path, index=False)
-                    archivos_generados.append(path)
-                
-                # Día de la familia
-                df_dia_fam = df[(df['external_name_label'] == 'Día de la familia') & 
-                               (pd.to_numeric(df['calendar_days'], errors='coerce') > 1)]
-                if len(df_dia_fam) > 0:
-                    path = os.path.join(temp_dir, "dia_de_la_familia.xlsx")
-                    df_dia_fam.to_excel(path, index=False)
-                    archivos_generados.append(path)
-                
-                st.markdown('<div class="success-box">✅ Validaciones completadas exitosamente</div>', unsafe_allow_html=True)
-                
-                mostrar_metricas_custom([
-                    {'label': '📊 Total Registros', 'value': f"{len(df):,}"},
-                    {'label': '🚨 Errores SENA', 'value': len(df_errores_sena)},
-                    {'label': '🚨 Errores Ley 50', 'value': len(df_errores_ley50)},
-                    {'label': '📁 Archivos', 'value': len(archivos_generados)}
-                ])
-                
-                st.markdown("---")
-                st.markdown("### 👀 Vista Previa de Datos")
-                st.dataframe(df.head(10), use_container_width=True, height=400)
-                
-                st.markdown("---")
-                st.markdown("### 📦 Descargar Resultados")
-                
-                st.success(f"✅ {len(archivos_generados)} archivo(s) generado(s)")
-                for archivo in archivos_generados:
-                    st.markdown(f"• {os.path.basename(archivo)}")
-                
-                zip_data = crear_zip_desde_archivos(archivos_generados)
-                
-                col1, col2 = st.columns([3, 1])
-                with col1:
-                    st.download_button(
-                        f"📥 DESCARGAR ZIP - PASO 2 ({len(archivos_generados)} archivos)",
-                        zip_data,
-                        "PASO_2_Validaciones.zip",
-                        "application/zip",
-                        use_container_width=True,
-                        type="primary"
+                    temp_dir = tempfile.mkdtemp()
+                    
+                    csv_path = os.path.join(temp_dir, "ausentismo_procesado_completo_v2.csv")
+                    excel_path = os.path.join(temp_dir, "MD_personal.xlsx")
+                    
+                    with open(csv_path, "wb") as f:
+                        f.write(csv_paso1.getbuffer())
+                    with open(excel_path, "wb") as f:
+                        f.write(excel_personal.getbuffer())
+                    
+                    # Leer archivos
+                    df_ausentismo = pd.read_csv(csv_path, encoding='utf-8-sig')
+                    df_personal = pd.read_excel(excel_path)
+                    
+                    # Buscar columnas
+                    col_num_pers = next((col for col in df_personal.columns if 'pers' in col.lower() or 'personal' in col.lower()), None)
+                    col_relacion = next((col for col in df_personal.columns if 'relaci' in col.lower() and 'labor' in col.lower()), None)
+                    
+                    if not col_num_pers or not col_relacion:
+                        st.error("❌ No se encontraron las columnas necesarias en el archivo de personal")
+                        st.stop()
+                    
+                    # Merge
+                    df_ausentismo['id_personal'] = df_ausentismo['id_personal'].astype(str).str.strip()
+                    df_personal[col_num_pers] = df_personal[col_num_pers].astype(str).str.strip()
+                    
+                    df = pd.merge(
+                        df_ausentismo,
+                        df_personal[[col_num_pers, col_relacion]],
+                        left_on='id_personal',
+                        right_on=col_num_pers,
+                        how='left'
                     )
-                with col2:
-                    if st.button("▶️ Siguiente", use_container_width=True, type="secondary"):
-                        st.session_state.paso_actual = 3
-                        st.rerun()
-        
-        except Exception as e:
-            st.error(f"❌ Error durante la ejecución")
-            with st.expander("🔍 Ver detalles del error"):
-                import traceback
-                st.code(traceback.format_exc())
+                    
+                    if col_relacion != 'Relación laboral':
+                        df.rename(columns={col_relacion: 'Relación laboral'}, inplace=True)
+                    
+                    if col_num_pers != 'id_personal' and col_num_pers in df.columns:
+                        df.drop(columns=[col_num_pers], inplace=True)
+                    
+                    df = df[df['Relación laboral'].notna()]
+                    
+                    # Validaciones SENA
+                    df_aprendizaje = df[df['Relación laboral'].str.contains('Aprendizaje', case=False, na=False)].copy()
+                    conceptos_validos = ['Incapacidad gral SENA', 'Licencia de Maternidad SENA', 'Suspensión contrato SENA']
+                    df_errores_sena = df_aprendizaje[~df_aprendizaje['external_name_label'].isin(conceptos_validos)].copy()
+                    
+                    # Validaciones Ley 50
+                    df_ley50 = df[df['Relación laboral'].str.contains('Ley 50', case=False, na=False)].copy()
+                    prohibidos = ['Incapacidad gral SENA', 'Licencia de Maternidad SENA', 'Suspensión contrato SENA',
+                                 'Inca. Enfer Gral Integral', 'Prorr Inc/Enf Gral ntegra']
+                    df_errores_ley50 = df_ley50[df_ley50['external_name_label'].isin(prohibidos)].copy()
+                    
+                    # Columnas de validación
+                    df['licencia_paternidad'] = df.apply(
+                        lambda r: "Concepto Si Aplica" if r['external_name_label'] == "Licencia Paternidad" and r['calendar_days'] == '14' 
+                        else "Concepto No Aplica", axis=1)
+                    
+                    df['licencia_maternidad'] = df.apply(
+                        lambda r: "Concepto Si Aplica" if r['external_name_label'] == "Licencia Maternidad" and r['calendar_days'] == '126' 
+                        else "Concepto No Aplica", axis=1)
+                    
+                    df['ley_de_luto'] = df.apply(
+                        lambda r: "Concepto Si Aplica" if r['external_name_label'] == "Ley de luto" and r['quantity_in_days'] == '5' 
+                        else "Concepto No Aplica", axis=1)
+                    
+                    df['incap_fuera_de_turno'] = df.apply(
+                        lambda r: "Concepto Si Aplica" if r['external_name_label'] == "Incapa.fuera de turno" and 
+                        pd.to_numeric(r['calendar_days'], errors='coerce') <= 1 else "Concepto No Aplica", axis=1)
+                    
+                    df['lic_maternidad_sena'] = df.apply(
+                        lambda r: "Concepto Si Aplica" if r['external_name_label'] == "Licencia de Maternidad SENA" and r['calendar_days'] == '126' 
+                        else "Concepto No Aplica", axis=1)
+                    
+                    df['lic_jurado_votacion'] = df.apply(
+                        lambda r: "Concepto Si Aplica" if r['external_name_label'] == "Lic Jurado Votación" and 
+                        pd.to_numeric(r['calendar_days'], errors='coerce') <= 1 else "Concepto No Aplica", axis=1)
+                    
+                    # Guardar archivos
+                    archivo_principal = os.path.join(temp_dir, "relacion_laboral_con_validaciones.csv")
+                    df.to_csv(archivo_principal, index=False, encoding='utf-8-sig')
+                    
+                    archivos_generados = [archivo_principal]
+                    
+                    # Excels de errores
+                    if len(df_errores_sena) > 0:
+                        path = os.path.join(temp_dir, "Sena_error_validar.xlsx")
+                        df_errores_sena.to_excel(path, index=False)
+                        archivos_generados.append(path)
+                    
+                    if len(df_errores_ley50) > 0:
+                        path = os.path.join(temp_dir, "Ley_50_error_validar.xlsx")
+                        df_errores_ley50.to_excel(path, index=False)
+                        archivos_generados.append(path)
+                    
+                    # Alertas de licencias
+                    df_alert_pat = df[(df['licencia_paternidad'] == 'Concepto No Aplica') & (df['external_name_label'] == 'Licencia Paternidad')]
+                    if len(df_alert_pat) > 0:
+                        path = os.path.join(temp_dir, "alerta_licencia_paternidad.xlsx")
+                        df_alert_pat.to_excel(path, index=False)
+                        archivos_generados.append(path)
+                    
+                    df_alert_mat = df[(df['licencia_maternidad'] == 'Concepto No Aplica') & (df['external_name_label'] == 'Licencia Maternidad')]
+                    if len(df_alert_mat) > 0:
+                        path = os.path.join(temp_dir, "alerta_licencia_maternidad.xlsx")
+                        df_alert_mat.to_excel(path, index=False)
+                        archivos_generados.append(path)
+                    
+                    df_alert_luto = df[(df['ley_de_luto'] == 'Concepto No Aplica') & (df['external_name_label'] == 'Ley de luto')]
+                    if len(df_alert_luto) > 0:
+                        path = os.path.join(temp_dir, "alerta_ley_de_luto.xlsx")
+                        df_alert_luto.to_excel(path, index=False)
+                        archivos_generados.append(path)
+                    
+                    # Incapacidades > 30 días
+                    conceptos_incap = ['Incapacidad enfermedad general', 'Prorroga Inca/Enfer Gene', 'Enf Gral SOAT', 
+                                      'Inc. Accidente de Trabajo', 'Prorroga Inc. Accid. Trab']
+                    df_incap30 = df[(df['external_name_label'].isin(conceptos_incap)) & 
+                                   (pd.to_numeric(df['calendar_days'], errors='coerce') > 30)]
+                    if len(df_incap30) > 0:
+                        path = os.path.join(temp_dir, "incp_mayor_30_dias.xlsx")
+                        df_incap30.to_excel(path, index=False)
+                        archivos_generados.append(path)
+                    
+                    # Día de la familia
+                    df_dia_fam = df[(df['external_name_label'] == 'Día de la familia') & 
+                                   (pd.to_numeric(df['calendar_days'], errors='coerce') > 1)]
+                    if len(df_dia_fam) > 0:
+                        path = os.path.join(temp_dir, "dia_de_la_familia.xlsx")
+                        df_dia_fam.to_excel(path, index=False)
+                        archivos_generados.append(path)
+                    
+                    st.markdown('<div class="success-box">✅ Validaciones completadas exitosamente</div>', unsafe_allow_html=True)
+                    
+                    mostrar_metricas_custom([
+                        {'label': '📊 Total Registros', 'value': f"{len(df):,}"},
+                        {'label': '🚨 Errores SENA', 'value': len(df_errores_sena)},
+                        {'label': '🚨 Errores Ley 50', 'value': len(df_errores_ley50)},
+                        {'label': '📁 Archivos', 'value': len(archivos_generados)}
+                    ])
+                    
+                    st.markdown("---")
+                    st.markdown("### 👀 Vista Previa de Datos")
+                    st.dataframe(df.head(10), use_container_width=True, height=400)
+                    
+                    st.markdown("---")
+                    st.markdown("### 📦 Descargar Resultados")
+                    
+                    st.success(f"✅ {len(archivos_generados)} archivo(s) generado(s)")
+                    for archivo in archivos_generados:
+                        st.markdown(f"• {os.path.basename(archivo)}")
+                    
+                    zip_data = crear_zip_desde_archivos(archivos_generados)
+                    
+                    col1, col2 = st.columns([3, 1])
+                    with col1:
+                        st.download_button(
+                            f"📥 DESCARGAR ZIP - PASO 2 ({len(archivos_generados)} archivos)",
+                            zip_data,
+                            "PASO_2_Validaciones.zip",
+                            "application/zip",
+                            use_container_width=True,
+                            type="primary"
+                        )
+                    with col2:
+                        if st.button("▶️ Siguiente", use_container_width=True, type="secondary"):
+                            st.session_state.paso_actual = 3
+                            st.rerun()
+            
+            except Exception as e:
+                st.error(f"❌ Error durante la ejecución")
+                with st.expander("🔍 Ver detalles del error"):
+                    import traceback
+                    st.code(traceback.format_exc())
 
 # ============================================================================
 # PASO 3: REPORTE 45 Y CIE-10
@@ -593,79 +593,79 @@ def paso3():
         if st.button("🚀 PROCESAR ARCHIVOS", use_container_width=True, type="primary", key="procesar_paso3"):
             try:
                 with st.spinner('⏳ Ejecutando auditoria_ausentismos_part3.py...'):
-                temp_dir = tempfile.mkdtemp()
-                
-                csv_path = os.path.join(temp_dir, "relacion_laboral_con_validaciones.csv")
-                r45_path = os.path.join(temp_dir, "Reporte45.xlsx")
-                cie10_path = os.path.join(temp_dir, "CIE10.xlsx")
-                
-                with open(csv_path, "wb") as f:
-                    f.write(csv_paso2.getbuffer())
-                with open(r45_path, "wb") as f:
-                    f.write(excel_r45.getbuffer())
-                with open(cie10_path, "wb") as f:
-                    f.write(excel_cie10.getbuffer())
-                
-                import auditoria_ausentismos_part3 as part3
-                part3.ruta_relacion_laboral = csv_path
-                part3.ruta_reporte_45_excel = r45_path
-                part3.ruta_cie10 = cie10_path
-                part3.directorio_salida = temp_dir
-                
-                df_resultado = part3.procesar_todo()
-                
-                if df_resultado is not None:
-                    st.markdown('<div class="success-box">✅ Proceso completado exitosamente</div>', unsafe_allow_html=True)
+                    temp_dir = tempfile.mkdtemp()
                     
-                    alertas = (df_resultado['alerta_diagnostico'] == 'ALERTA DIAGNOSTICO').sum() if 'alerta_diagnostico' in df_resultado.columns else 0
-                    con_cie = df_resultado['cie10_codigo'].notna().sum() if 'cie10_codigo' in df_resultado.columns else 0
+                    csv_path = os.path.join(temp_dir, "relacion_laboral_con_validaciones.csv")
+                    r45_path = os.path.join(temp_dir, "Reporte45.xlsx")
+                    cie10_path = os.path.join(temp_dir, "CIE10.xlsx")
                     
-                    mostrar_metricas_custom([
-                        {'label': '📊 Total Registros', 'value': f"{len(df_resultado):,}"},
-                        {'label': '🚨 Alertas Diagnóstico', 'value': alertas},
-                        {'label': '🏥 Con CIE-10', 'value': con_cie},
-                        {'label': '📋 Columnas', 'value': len(df_resultado.columns)}
-                    ])
+                    with open(csv_path, "wb") as f:
+                        f.write(csv_paso2.getbuffer())
+                    with open(r45_path, "wb") as f:
+                        f.write(excel_r45.getbuffer())
+                    with open(cie10_path, "wb") as f:
+                        f.write(excel_cie10.getbuffer())
                     
-                    st.markdown("---")
-                    st.markdown("### 👀 Vista Previa de Datos")
-                    st.dataframe(df_resultado.head(10), use_container_width=True, height=400)
+                    import auditoria_ausentismos_part3 as part3
+                    part3.ruta_relacion_laboral = csv_path
+                    part3.ruta_reporte_45_excel = r45_path
+                    part3.ruta_cie10 = cie10_path
+                    part3.directorio_salida = temp_dir
                     
-                    st.markdown("---")
-                    st.markdown("### 📦 Descargar Resultados")
+                    df_resultado = part3.procesar_todo()
                     
-                    archivo_final = os.path.join(temp_dir, "ausentismos_completo_con_cie10.csv")
-                    archivo_alertas = os.path.join(temp_dir, "ALERTA_DIAGNOSTICO.xlsx")
-                    
-                    archivos = [archivo_final]
-                    if os.path.exists(archivo_alertas):
-                        archivos.append(archivo_alertas)
-                        st.success(f"✅ {len(archivos)} archivo(s) generado(s)")
+                    if df_resultado is not None:
+                        st.markdown('<div class="success-box">✅ Proceso completado exitosamente</div>', unsafe_allow_html=True)
+                        
+                        alertas = (df_resultado['alerta_diagnostico'] == 'ALERTA DIAGNOSTICO').sum() if 'alerta_diagnostico' in df_resultado.columns else 0
+                        con_cie = df_resultado['cie10_codigo'].notna().sum() if 'cie10_codigo' in df_resultado.columns else 0
+                        
+                        mostrar_metricas_custom([
+                            {'label': '📊 Total Registros', 'value': f"{len(df_resultado):,}"},
+                            {'label': '🚨 Alertas Diagnóstico', 'value': alertas},
+                            {'label': '🏥 Con CIE-10', 'value': con_cie},
+                            {'label': '📋 Columnas', 'value': len(df_resultado.columns)}
+                        ])
+                        
+                        st.markdown("---")
+                        st.markdown("### 👀 Vista Previa de Datos")
+                        st.dataframe(df_resultado.head(10), use_container_width=True, height=400)
+                        
+                        st.markdown("---")
+                        st.markdown("### 📦 Descargar Resultados")
+                        
+                        archivo_final = os.path.join(temp_dir, "ausentismos_completo_con_cie10.csv")
+                        archivo_alertas = os.path.join(temp_dir, "ALERTA_DIAGNOSTICO.xlsx")
+                        
+                        archivos = [archivo_final]
+                        if os.path.exists(archivo_alertas):
+                            archivos.append(archivo_alertas)
+                            st.success(f"✅ {len(archivos)} archivo(s) generado(s)")
+                        else:
+                            st.success(f"✅ 1 archivo generado (sin alertas de diagnóstico)")
+                        
+                        for archivo in archivos:
+                            st.markdown(f"• {os.path.basename(archivo)}")
+                        
+                        zip_data = crear_zip_desde_archivos(archivos)
+                        
+                        col1, col2 = st.columns([3, 1])
+                        with col1:
+                            st.download_button(
+                                f"📥 DESCARGAR ZIP - PASO 3 ({len(archivos)} archivos)",
+                                zip_data,
+                                "PASO_3_CIE10.zip",
+                                "application/zip",
+                                use_container_width=True,
+                                type="primary"
+                            )
+                        with col2:
+                            if st.button("🎉 Finalizar", use_container_width=True, type="secondary"):
+                                st.balloons()
+                                st.success("¡Proceso completado!")
                     else:
-                        st.success(f"✅ 1 archivo generado (sin alertas de diagnóstico)")
-                    
-                    for archivo in archivos:
-                        st.markdown(f"• {os.path.basename(archivo)}")
-                    
-                    zip_data = crear_zip_desde_archivos(archivos)
-                    
-                    col1, col2 = st.columns([3, 1])
-                    with col1:
-                        st.download_button(
-                            f"📥 DESCARGAR ZIP - PASO 3 ({len(archivos)} archivos)",
-                            zip_data,
-                            "PASO_3_CIE10.zip",
-                            "application/zip",
-                            use_container_width=True,
-                            type="primary"
-                        )
-                    with col2:
-                        if st.button("🎉 Finalizar", use_container_width=True, type="secondary"):
-                            st.balloons()
-                            st.success("¡Proceso completado!")
-                else:
-                    st.error("❌ Error en el procesamiento")
-        
+                        st.error("❌ Error en el procesamiento")
+            
             except Exception as e:
                 st.error(f"❌ Error durante la ejecución")
                 with st.expander("🔍 Ver detalles del error"):
@@ -694,8 +694,8 @@ with st.sidebar:
     # Botones de navegación
     if st.session_state.paso_actual == 1:
         st.markdown("""
-        <div style='background: white; padding: 1rem; border-radius: 10px; margin-bottom: 1rem; border-left: 4px solid #667eea;'>
-            <p style='margin: 0; font-weight: 700; color: #667eea;'>📄 PASO 1: Procesamiento ◄</p>
+        <div style='background: white; padding: 1rem; border-radius: 10px; margin-bottom: 1rem; border-left: 4px solid #3498db;'>
+            <p style='margin: 0; font-weight: 700; color: #2c3e50;'>📄 PASO 1: Procesamiento ◄</p>
         </div>
         """, unsafe_allow_html=True)
     else:
@@ -705,8 +705,8 @@ with st.sidebar:
     
     if st.session_state.paso_actual == 2:
         st.markdown("""
-        <div style='background: white; padding: 1rem; border-radius: 10px; margin-bottom: 1rem; border-left: 4px solid #667eea;'>
-            <p style='margin: 0; font-weight: 700; color: #667eea;'>🔗 PASO 2: Validaciones ◄</p>
+        <div style='background: white; padding: 1rem; border-radius: 10px; margin-bottom: 1rem; border-left: 4px solid #3498db;'>
+            <p style='margin: 0; font-weight: 700; color: #2c3e50;'>🔗 PASO 2: Validaciones ◄</p>
         </div>
         """, unsafe_allow_html=True)
     else:
@@ -716,8 +716,8 @@ with st.sidebar:
     
     if st.session_state.paso_actual == 3:
         st.markdown("""
-        <div style='background: white; padding: 1rem; border-radius: 10px; margin-bottom: 1rem; border-left: 4px solid #667eea;'>
-            <p style='margin: 0; font-weight: 700; color: #667eea;'>🏥 PASO 3: CIE-10 ◄</p>
+        <div style='background: white; padding: 1rem; border-radius: 10px; margin-bottom: 1rem; border-left: 4px solid #3498db;'>
+            <p style='margin: 0; font-weight: 700; color: #2c3e50;'>🏥 PASO 3: CIE-10 ◄</p>
         </div>
         """, unsafe_allow_html=True)
     else:
@@ -745,7 +745,7 @@ with st.sidebar:
         <h3 style='color: white; font-size: 1.2rem; margin: 0 0 1rem 0;'>💡 Información</h3>
         <p style='color: white; font-size: 0.85rem; line-height: 1.6;'>
             Sistema que ejecuta scripts Python existentes (part1, part2, part3) 
-            de forma secuencial y descarga los resultados en formato ZIP.
+            de forma secuencial. Presiona "🚀 PROCESAR ARCHIVOS" para ejecutar cada paso.
         </p>
     </div>
     """, unsafe_allow_html=True)
