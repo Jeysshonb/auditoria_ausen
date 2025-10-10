@@ -370,12 +370,24 @@ def paso2():
                     df_ausentismo = pd.read_csv(csv_path, encoding='utf-8-sig')
                     df_personal = pd.read_excel(excel_path)
                     
+                    st.info(f"📊 CSV: {len(df_ausentismo):,} registros | Excel: {len(df_personal):,} registros")
+                    
+                    # Mostrar columnas disponibles
+                    with st.expander("🔍 Columnas disponibles en Excel Personal", expanded=True):
+                        st.write("**Columnas encontradas:**")
+                        for i, col in enumerate(df_personal.columns, 1):
+                            st.write(f"{i}. `{col}`")
+                    
                     # Buscar columnas
                     col_num_pers = next((col for col in df_personal.columns if 'pers' in col.lower() or 'personal' in col.lower()), None)
                     col_relacion = next((col for col in df_personal.columns if 'relaci' in col.lower() and 'labor' in col.lower()), None)
                     
+                    st.info(f"🔍 Columna ID Personal encontrada: `{col_num_pers}`")
+                    st.info(f"🔍 Columna Relación Laboral encontrada: `{col_relacion}`")
+                    
                     if not col_num_pers or not col_relacion:
                         st.error("❌ No se encontraron las columnas necesarias en el archivo de personal")
+                        st.warning("⚠️ Necesitamos una columna con 'personal' o 'pers' y otra con 'relación laboral'")
                         st.stop()
                     
                     # Merge
