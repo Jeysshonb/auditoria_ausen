@@ -10,7 +10,7 @@ print("="*80)
 # ============================================================================
 
 # Rutas de archivos para el merge
-csv_ausentismo = r"C:\Users\jjbustos\OneDrive - Grupo Jerónimo Martins\Documents\auditoria ausentismos\archivos_salida\ausentismo_procesado_especifico.csv"
+csv_ausentismo = r"C:\Users\jjbustos\OneDrive - Grupo Jerónimo Martins\Documents\auditoria ausentismos\archivos_salida\ausentismo_procesado_completo_v2.csv"
 excel_personal = r"C:\Users\jjbustos\OneDrive - Grupo Jerónimo Martins\Documents\auditoria ausentismos\archivos_planos\MD_26082025.XLSX"
 carpeta_salida = r"C:\Users\jjbustos\OneDrive - Grupo Jerónimo Martins\Documents\auditoria ausentismos\archivos_salida"
 archivo_relacion_laboral = os.path.join(carpeta_salida, "relacion_laboral.csv")
@@ -209,6 +209,7 @@ else:
         'Suspensión contrato SENA',
         'Inca. Enfer Gral Integral',
         'Prorr Inc/Enf Gral ntegra'
+        
     ]
     
     print(f"\n{'='*60}")
