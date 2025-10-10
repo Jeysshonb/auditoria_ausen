@@ -257,7 +257,9 @@ def paso1():
                     part1.ruta_entrada_csv = csv_path
                     part1.ruta_entrada_excel = excel_path
                     part1.directorio_salida = temp_dir
-                    st.success("✅ Rutas configuradas")
+                    part1.archivo_salida = "ausentismo_procesado_completo_v2.csv"
+                    part1.ruta_completa_salida = os.path.join(temp_dir, "ausentismo_procesado_completo_v2.csv")
+                    st.success(f"✅ Rutas configuradas - Salida: {part1.ruta_completa_salida}")
                     
                     st.info("🔍 DEBUG: Ejecutando procesar_archivo_ausentismos()...")
                     
