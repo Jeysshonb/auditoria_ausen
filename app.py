@@ -17,161 +17,125 @@ st.set_page_config(
 # ============================================================================
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
     
     * {
-        font-family: 'Poppins', sans-serif;
+        font-family: 'Inter', sans-serif;
     }
     
     .main-header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 3rem 2rem;
-        border-radius: 20px;
+        background: #2c3e50;
+        padding: 2.5rem 2rem;
+        border-radius: 10px;
         margin-bottom: 2rem;
-        box-shadow: 0 20px 60px rgba(102, 126, 234, 0.3);
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         text-align: center;
-        position: relative;
-        overflow: hidden;
-    }
-    
-    .main-header::before {
-        content: '';
-        position: absolute;
-        top: -50%;
-        right: -50%;
-        width: 200%;
-        height: 200%;
-        background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
-        animation: pulse 4s ease-in-out infinite;
-    }
-    
-    @keyframes pulse {
-        0%, 100% { transform: scale(1); }
-        50% { transform: scale(1.1); }
     }
     
     .main-header h1 {
         color: white;
         margin: 0;
-        font-size: 3rem;
+        font-size: 2.5rem;
         font-weight: 700;
-        text-shadow: 2px 2px 8px rgba(0,0,0,0.2);
-        position: relative;
-        z-index: 1;
     }
     
     .main-header p {
-        color: #e0e7ff;
-        margin: 1rem 0 0 0;
-        font-size: 1.3rem;
+        color: #ecf0f1;
+        margin: 0.5rem 0 0 0;
+        font-size: 1.1rem;
         font-weight: 400;
-        position: relative;
-        z-index: 1;
     }
     
     .paso-header {
-        background: linear-gradient(to right, #f8f9fa, #ffffff);
-        padding: 2rem;
-        border-radius: 15px;
-        border-left: 6px solid #667eea;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        background: #f8f9fa;
+        padding: 1.5rem;
+        border-radius: 8px;
+        border-left: 4px solid #3498db;
         margin-bottom: 2rem;
     }
     
     .paso-header h2 {
-        color: #667eea;
+        color: #2c3e50;
         margin: 0;
-        font-size: 2rem;
+        font-size: 1.8rem;
         font-weight: 700;
     }
     
     .paso-header p {
-        color: #666;
+        color: #7f8c8d;
         margin: 0.5rem 0 0 0;
-        font-size: 1.1rem;
-    }
-    
-    .info-card {
-        background: white;
-        padding: 1.5rem;
-        border-radius: 12px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        margin: 1rem 0;
-        border-top: 4px solid #667eea;
+        font-size: 1rem;
     }
     
     .metric-container {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: white;
         padding: 1.5rem;
-        border-radius: 12px;
+        border-radius: 8px;
         text-align: center;
-        color: white;
-        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
-        transition: transform 0.3s ease;
+        border: 2px solid #e8e8e8;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        transition: all 0.3s ease;
     }
     
     .metric-container:hover {
-        transform: translateY(-5px);
+        border-color: #3498db;
+        box-shadow: 0 4px 12px rgba(52, 152, 219, 0.15);
     }
     
     .metric-label {
         font-size: 0.9rem;
-        opacity: 0.9;
+        color: #7f8c8d;
         margin-bottom: 0.5rem;
+        font-weight: 600;
     }
     
     .metric-value {
         font-size: 2.5rem;
         font-weight: 700;
+        color: #2c3e50;
     }
     
     .success-box {
-        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        background: #27ae60;
         color: white;
-        padding: 1.5rem;
-        border-radius: 12px;
-        margin: 1.5rem 0;
-        font-weight: 600;
-        text-align: center;
-        font-size: 1.2rem;
-        box-shadow: 0 8px 25px rgba(17, 153, 142, 0.3);
-    }
-    
-    .warning-box {
-        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-        color: white;
-        padding: 1.5rem;
-        border-radius: 12px;
+        padding: 1.2rem;
+        border-radius: 8px;
         margin: 1.5rem 0;
         font-weight: 600;
         text-align: center;
         font-size: 1.1rem;
-        box-shadow: 0 8px 25px rgba(240, 147, 251, 0.3);
+    }
+    
+    .warning-box {
+        background: #e74c3c;
+        color: white;
+        padding: 1.2rem;
+        border-radius: 8px;
+        margin: 1.5rem 0;
+        font-weight: 600;
+        text-align: center;
+        font-size: 1rem;
     }
     
     .stButton > button {
-        border-radius: 10px;
+        border-radius: 6px;
         font-weight: 600;
-        transition: all 0.3s ease;
+        transition: all 0.2s ease;
     }
     
     .stButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     }
     
     div[data-testid="stMetricValue"] {
-        font-size: 2.5rem;
+        font-size: 2rem;
         font-weight: 700;
-        color: #667eea;
-    }
-    
-    .sidebar .sidebar-content {
-        background: linear-gradient(180deg, #f8f9fa 0%, #ffffff 100%);
+        color: #2c3e50;
     }
     
     [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+        background: #34495e;
     }
 </style>
 """, unsafe_allow_html=True)
