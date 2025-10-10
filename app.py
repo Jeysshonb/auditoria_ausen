@@ -292,7 +292,8 @@ def paso1():
                         else:
                             st.warning("⚠️ Archivo no encontrado, pero procesamiento completado")
                     else:
-                        st.error("❌ Error en el procesamiento")
+                        st.error("❌ PASO 1: El procesamiento devolvió None")
+                        st.info("Revisa el output del script arriba para más detalles")
             
             except Exception as e:
                 st.error(f"❌ Error: {str(e)}")
@@ -605,6 +606,7 @@ def paso3():
     
     if csv_paso2 and excel_r45 and excel_cie10:
         st.markdown("---")
+        st.success("✅ Los 3 archivos están cargados correctamente")
         
         if st.button("🚀 PROCESAR ARCHIVOS", use_container_width=True, type="primary", key="procesar_paso3"):
             try:
