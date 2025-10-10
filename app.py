@@ -1,361 +1,587 @@
+import streamlit as st
 import pandas as pd
-import numpy as np
-import warnings
+from io import BytesIO
+import zipfile
 import os
-warnings.filterwarnings('ignore')
+import tempfile
+
+st.set_page_config(
+    page_title="Auditoría Ausentismos",
+    page_icon="📊",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
 # ============================================================================
-# CONFIGURACIÓN DE RUTAS (Se pueden sobrescribir desde la app)
+# ESTILOS CSS - CORREGIDOS
 # ============================================================================
-ruta_relacion_laboral = None
-ruta_reporte_45_excel = None
-ruta_cie10 = None
-directorio_salida = None
-ruta_completa_salida = None
-ruta_alertas = None
+st.markdown("""
+<style>
+    .main-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 2rem;
+        border-radius: 10px;
+        margin-bottom: 2rem;
+        text-align: center;
+    }
+    
+    .main-header h1 {
+        color: white;
+        margin: 0;
+        font-size: 2.5rem;
+    }
+    
+    .main-header p {
+        color: white;
+        margin: 0.5rem 0 0 0;
+        font-size: 1.1rem;
+    }
+    
+    .paso-header {
+        background: #f8f9fa;
+        padding: 1.5rem;
+        border-radius: 8px;
+        border-left: 4px solid #667eea;
+        margin-bottom: 2rem;
+    }
+    
+    .paso-header h2 {
+        color: #2c3e50;
+        margin: 0;
+        font-size: 1.8rem;
+    }
+    
+    .paso-header p {
+        color: #7f8c8d;
+        margin: 0.5rem 0 0 0;
+    }
+    
+    .success-box {
+        background: #27ae60;
+        color: white;
+        padding: 1rem;
+        border-radius: 8px;
+        margin: 1rem 0;
+        text-align: center;
+    }
+    
+    .warning-box {
+        background: #e74c3c;
+        color: white;
+        padding: 1rem;
+        border-radius: 8px;
+        margin: 1rem 0;
+        text-align: center;
+    }
+    
+    .info-box {
+        background: #3498db;
+        color: white;
+        padding: 1rem;
+        border-radius: 8px;
+        margin: 1rem 0;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # ============================================================================
-# FUNCIÓN AUXILIAR: PARSEO DE FECHAS ROBUSTO
+# INICIALIZACIÓN
 # ============================================================================
-def parsear_fecha_flexible(fecha_str):
-    """
-    Intenta parsear una fecha en múltiples formatos comunes.
-    Retorna un objeto datetime o NaT si falla.
-    """
-    if pd.isna(fecha_str) or fecha_str == '':
-        return pd.NaT
-    
-    fecha_str = str(fecha_str).strip()
-    
-    # Lista de formatos a probar
-    formatos = [
-        '%d/%m/%Y',
-        '%d-%m-%Y',
-        '%Y-%m-%d',
-        '%d/%m/%Y %H:%M:%S',
-        '%d-%m-%Y %H:%M:%S',
-        '%Y-%m-%d %H:%M:%S'
-    ]
-    
-    for formato in formatos:
-        try:
-            return pd.to_datetime(fecha_str, format=formato)
-        except:
-            continue
-    
-    # Si ningún formato funciona, intentar parseo automático
-    try:
-        fecha_parseada = pd.to_datetime(fecha_str, dayfirst=False, errors='coerce')
-        return fecha_parseada
-    except:
-        return pd.NaT
+if 'paso_actual' not in st.session_state:
+    st.session_state.paso_actual = 1
 
 # ============================================================================
-# FUNCIÓN PRINCIPAL
+# FUNCIONES AUXILIARES
 # ============================================================================
-def procesar_todo():
-    """
-    Procesa todo el flujo del Paso 3:
-    1. Carga datos del Paso 2
-    2. Filtra subtipos específicos
-    3. Merge con Reporte 45
-    4. Valida diagnósticos
-    5. Enriquece con CIE-10
-    6. Genera archivos de salida
-    """
-    
-    # ========================================================================
-    # 1. VALIDAR RUTAS
-    # ========================================================================
-    if not all([ruta_relacion_laboral, ruta_reporte_45_excel, ruta_cie10, directorio_salida]):
-        print("❌ ERROR: Faltan rutas de configuración")
-        return None
-    
-    # Crear directorio de salida si no existe
-    os.makedirs(directorio_salida, exist_ok=True)
-    
-    # Configurar rutas de archivos de salida
-    global ruta_completa_salida, ruta_alertas
-    if ruta_completa_salida is None:
-        ruta_completa_salida = os.path.join(directorio_salida, "ausentismos_completo_con_cie10.csv")
-    if ruta_alertas is None:
-        ruta_alertas = os.path.join(directorio_salida, "ALERTA_DIAGNOSTICO.xlsx")
-    
-    print("\n" + "="*70)
-    print("🏥 PASO 3: MERGE CON REPORTE 45 Y CIE-10")
-    print("="*70)
-    
-    # ========================================================================
-    # 2. CARGAR DATOS DEL PASO 2
-    # ========================================================================
-    print("\n📂 Cargando archivo del Paso 2...")
-    try:
-        df = pd.read_csv(ruta_relacion_laboral, encoding='utf-8-sig')
-        print(f"✅ Cargado: {len(df):,} registros, {len(df.columns)} columnas")
-    except Exception as e:
-        print(f"❌ Error al cargar CSV del Paso 2: {e}")
-        return None
-    
-    # ========================================================================
-    # 3. FILTRAR SUBTIPOS ESPECÍFICOS
-    # ========================================================================
-    print("\n🔍 Filtrando 17 subtipos específicos...")
-    
-    subtipos_validos = [
-        'Incapacidad enfermedad general',
-        'Prorroga Inca/Enfer Gene',
-        'Enf Gral SOAT',
-        'Inc. Accidente de Trabajo',
-        'Prorroga Inc. Accid. Trab',
-        'Incapacidad gral SENA',
-        'Licencia Maternidad',
-        'Licencia de Maternidad SENA',
-        'Licencia Paternidad',
-        'Calamidad domestica',
-        'Ley de luto',
-        'Otros permisos',
-        'Día de la familia',
-        'Susp. Contrato de Trabajo',
-        'Suspensión contrato SENA',
-        'Incapa.fuera de turno',
-        'Inca. Enfer Gral Integral'
-    ]
-    
-    df_filtrado = df[df['external_name_label'].isin(subtipos_validos)].copy()
-    print(f"✅ Registros después del filtro: {len(df_filtrado):,}")
-    print(f"   Registros eliminados: {len(df) - len(df_filtrado):,}")
-    
-    if len(df_filtrado) == 0:
-        print("⚠️ WARNING: No quedan registros después del filtro")
-        return None
-    
-    # ========================================================================
-    # 4. CARGAR Y PROCESAR REPORTE 45
-    # ========================================================================
-    print("\n📂 Cargando Reporte 45 desde Excel...")
-    try:
-        df_r45 = pd.read_excel(ruta_reporte_45_excel)
-        print(f"✅ Cargado: {len(df_r45):,} registros")
-    except Exception as e:
-        print(f"❌ Error al cargar Reporte 45: {e}")
-        return None
-    
-    # Limpiar nombres de columnas
-    df_r45.columns = df_r45.columns.str.strip()
-    
-    print("\n🔧 Preparando Reporte 45 para merge...")
-    
-    # Identificar columnas necesarias
-    col_fecha_inicio = next((col for col in df_r45.columns if 'inicio' in col.lower() and 'fecha' in col.lower()), None)
-    col_fecha_fin = next((col for col in df_r45.columns if 'fin' in col.lower() and 'fecha' in col.lower()), None)
-    col_diagnostico = next((col for col in df_r45.columns if 'diagn' in col.lower()), None)
-    col_empleado = next((col for col in df_r45.columns if 'empl' in col.lower() or 'pers' in col.lower()), None)
-    
-    print(f"   Columna Fecha Inicio: {col_fecha_inicio}")
-    print(f"   Columna Fecha Fin: {col_fecha_fin}")
-    print(f"   Columna Diagnóstico: {col_diagnostico}")
-    print(f"   Columna Empleado: {col_empleado}")
-    
-    if not all([col_fecha_inicio, col_fecha_fin, col_diagnostico, col_empleado]):
-        print("⚠️ WARNING: No se encontraron todas las columnas necesarias en Reporte 45")
-        print("   Columnas disponibles:", df_r45.columns.tolist())
-        return None
-    
-    # Renombrar columnas estándar
-    df_r45 = df_r45.rename(columns={
-        col_fecha_inicio: 'fecha_inicio_r45',
-        col_fecha_fin: 'fecha_fin_r45',
-        col_diagnostico: 'diagnostico',
-        col_empleado: 'empleado_num'
-    })
-    
-    # Convertir empleado a string
-    df_r45['empleado_num'] = df_r45['empleado_num'].astype(str).str.strip()
-    
-    # Parsear fechas usando función robusta
-    print("   Parseando fechas...")
-    df_r45['fecha_inicio_r45'] = df_r45['fecha_inicio_r45'].apply(parsear_fecha_flexible)
-    df_r45['fecha_fin_r45'] = df_r45['fecha_fin_r45'].apply(parsear_fecha_flexible)
-    
-    # Crear llave de merge
-    df_r45['llave_merge'] = (
-        df_r45['empleado_num'].astype(str) + '_' +
-        df_r45['fecha_inicio_r45'].dt.strftime('%Y-%m-%d') + '_' +
-        df_r45['fecha_fin_r45'].dt.strftime('%Y-%m-%d')
-    )
-    
-    print(f"✅ Reporte 45 preparado con {len(df_r45):,} registros")
-    
-    # ========================================================================
-    # 5. PREPARAR DF_FILTRADO PARA MERGE
-    # ========================================================================
-    print("\n🔧 Preparando datos filtrados para merge...")
-    
-    # Convertir fechas si no están ya en formato datetime
-    if 'fecha_inicio' not in df_filtrado.columns or 'fecha_fin' not in df_filtrado.columns:
-        print("⚠️ WARNING: No se encuentran columnas fecha_inicio/fecha_fin")
-        return None
-    
-    df_filtrado['fecha_inicio'] = pd.to_datetime(df_filtrado['fecha_inicio'], errors='coerce')
-    df_filtrado['fecha_fin'] = pd.to_datetime(df_filtrado['fecha_fin'], errors='coerce')
-    
-    # Convertir id_personal a string
-    df_filtrado['id_personal'] = df_filtrado['id_personal'].astype(str).str.strip()
-    
-    # Crear llave de merge
-    df_filtrado['llave_merge'] = (
-        df_filtrado['id_personal'].astype(str) + '_' +
-        df_filtrado['fecha_inicio'].dt.strftime('%Y-%m-%d') + '_' +
-        df_filtrado['fecha_fin'].dt.strftime('%Y-%m-%d')
-    )
-    
-    print(f"✅ Datos preparados: {len(df_filtrado):,} registros con llave de merge")
-    
-    # ========================================================================
-    # 6. MERGE CON REPORTE 45
-    # ========================================================================
-    print("\n🔗 Realizando merge con Reporte 45...")
-    
-    # Seleccionar solo columnas necesarias de R45
-    df_r45_mini = df_r45[['llave_merge', 'diagnostico']].copy()
-    
-    # Merge
-    df_merged = pd.merge(
-        df_filtrado,
-        df_r45_mini,
-        on='llave_merge',
-        how='left'
-    )
-    
-    print(f"✅ Merge completado: {len(df_merged):,} registros")
-    
-    # ========================================================================
-    # 7. VALIDAR DIAGNÓSTICOS REQUERIDOS
-    # ========================================================================
-    print("\n🩺 Validando diagnósticos requeridos...")
-    
-    conceptos_requieren_diagnostico = [
-        'Incapacidad enfermedad general',
-        'Prorroga Inca/Enfer Gene',
-        'Enf Gral SOAT',
-        'Inc. Accidente de Trabajo',
-        'Prorroga Inc. Accid. Trab',
-        'Incapacidad gral SENA',
-        'Licencia Maternidad',
-        'Licencia de Maternidad SENA',
-        'Licencia Paternidad',
-        'Incapa.fuera de turno',
-        'Inca. Enfer Gral Integral'
-    ]
-    
-    # Crear columna de alerta
-    df_merged['alerta_diagnostico'] = df_merged.apply(
-        lambda row: 'ALERTA DIAGNOSTICO' 
-        if row['external_name_label'] in conceptos_requieren_diagnostico and pd.isna(row['diagnostico'])
-        else 'OK',
-        axis=1
-    )
-    
-    alertas_count = (df_merged['alerta_diagnostico'] == 'ALERTA DIAGNOSTICO').sum()
-    print(f"⚠️ Registros con alerta de diagnóstico: {alertas_count:,}")
-    
-    # ========================================================================
-    # 8. CARGAR Y PROCESAR CIE-10
-    # ========================================================================
-    print("\n📂 Cargando tabla CIE-10...")
-    try:
-        df_cie10 = pd.read_excel(ruta_cie10)
-        print(f"✅ Cargado: {len(df_cie10):,} códigos CIE-10")
-    except Exception as e:
-        print(f"❌ Error al cargar CIE-10: {e}")
-        return None
-    
-    # Limpiar columnas
-    df_cie10.columns = df_cie10.columns.str.strip()
-    
-    # Identificar columna de código
-    col_codigo = next((col for col in df_cie10.columns if 'cod' in col.lower() or 'clave' in col.lower()), None)
-    
-    if col_codigo is None:
-        print("⚠️ WARNING: No se encontró columna de código en CIE-10")
-        print("   Columnas disponibles:", df_cie10.columns.tolist())
-        col_codigo = df_cie10.columns[0]
-        print(f"   Usando primera columna: {col_codigo}")
-    
-    df_cie10 = df_cie10.rename(columns={col_codigo: 'cie10_codigo'})
-    
-    # Limpiar código
-    df_cie10['cie10_codigo'] = df_cie10['cie10_codigo'].astype(str).str.strip().str.upper()
-    df_merged['diagnostico'] = df_merged['diagnostico'].astype(str).str.strip().str.upper()
-    
-    print(f"✅ CIE-10 preparado con columna: {col_codigo}")
-    
-    # ========================================================================
-    # 9. MERGE CON CIE-10
-    # ========================================================================
-    print("\n🔗 Enriqueciendo con información CIE-10...")
-    
-    df_final = pd.merge(
-        df_merged,
-        df_cie10,
-        left_on='diagnostico',
-        right_on='cie10_codigo',
-        how='left'
-    )
-    
-    registros_con_cie10 = df_final['cie10_codigo'].notna().sum()
-    print(f"✅ Registros enriquecidos con CIE-10: {registros_con_cie10:,}")
-    print(f"   Registros sin match CIE-10: {len(df_final) - registros_con_cie10:,}")
-    
-    # ========================================================================
-    # 10. GUARDAR ARCHIVO PRINCIPAL
-    # ========================================================================
-    print("\n💾 Guardando archivo principal...")
-    try:
-        df_final.to_csv(ruta_completa_salida, index=False, encoding='utf-8-sig', quoting=1, lineterminator='\n')
-        print(f"✅ Guardado: {os.path.basename(ruta_completa_salida)}")
-        print(f"   Ruta: {ruta_completa_salida}")
-    except Exception as e:
-        print(f"❌ Error al guardar archivo principal: {e}")
-        return None
-    
-    # ========================================================================
-    # 11. GENERAR ARCHIVO DE ALERTAS
-    # ========================================================================
-    print("\n📊 Generando archivo de alertas...")
-    
-    df_alertas = df_final[df_final['alerta_diagnostico'] == 'ALERTA DIAGNOSTICO'].copy()
-    
-    if len(df_alertas) > 0:
-        try:
-            df_alertas.to_excel(ruta_alertas, index=False)
-            print(f"✅ Guardado: {os.path.basename(ruta_alertas)}")
-            print(f"   Alertas generadas: {len(df_alertas):,}")
-        except Exception as e:
-            print(f"⚠️ Error al guardar alertas: {e}")
-    else:
-        print("✅ No hay alertas de diagnóstico para generar archivo")
-    
-    # ========================================================================
-    # 12. RESUMEN FINAL
-    # ========================================================================
-    print("\n" + "="*70)
-    print("📊 RESUMEN FINAL - PASO 3")
-    print("="*70)
-    print(f"✅ Total registros procesados: {len(df_final):,}")
-    print(f"✅ Registros con CIE-10: {registros_con_cie10:,}")
-    print(f"⚠️ Alertas de diagnóstico: {alertas_count:,}")
-    print(f"✅ Columnas totales: {len(df_final.columns)}")
-    print(f"✅ Archivo principal: {os.path.basename(ruta_completa_salida)}")
-    if len(df_alertas) > 0:
-        print(f"✅ Archivo alertas: {os.path.basename(ruta_alertas)}")
-    print("="*70)
-    
-    return df_final
+def crear_zip_desde_archivos(archivos_paths):
+    """Crea ZIP desde rutas de archivos existentes"""
+    zip_buffer = BytesIO()
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        for ruta in archivos_paths:
+            if os.path.exists(ruta):
+                zip_file.write(ruta, os.path.basename(ruta))
+    return zip_buffer.getvalue()
+
+def mostrar_header_principal():
+    st.markdown("""
+    <div class="main-header">
+        <h1>📊 Auditoría de Ausentismos</h1>
+        <p>Sistema Integrado de Gestión y Validación</p>
+    </div>
+    """, unsafe_allow_html=True)
 
 # ============================================================================
-# EJECUCIÓN DIRECTA (PARA TESTING)
+# PASO 1: PROCESAMIENTO INICIAL
 # ============================================================================
-if __name__ == "__main__":
-    print("⚠️ Este script debe ser ejecutado desde la aplicación Streamlit")
-    print("   O configura las rutas manualmente antes de ejecutar")
+def paso1():
+    mostrar_header_principal()
+    
+    st.markdown("""
+    <div class="paso-header">
+        <h2>📄 PASO 1: Procesamiento Inicial</h2>
+        <p>CONCAT de CSV + Excel Reporte 45 con homologación y validaciones</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    with st.expander("ℹ️ ¿Qué hace este paso?", expanded=False):
+        st.write("**📥 Archivos de Entrada:**")
+        st.write("• CSV de Ausentismos (Success Factors)")
+        st.write("• Excel Reporte 45 (SAP)")
+        
+        st.write("**📤 Archivos de Salida:**")
+        st.write("• ausentismo_procesado_completo_v2.csv")
+        
+        st.write("**🔧 Procesos Ejecutados:**")
+        st.write("• Concatenación de CSV + Excel")
+        st.write("• Homologación SSF vs SAP")
+        st.write("• Identificación de validadores")
+        st.write("• Generación de llaves únicas")
+    
+    st.warning("🔴 Este paso requiere 2 archivos")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("📤 Archivo 1")
+        csv_file = st.file_uploader(
+            "CSV de Ausentismos",
+            type=['csv'],
+            key="csv1",
+            help="Archivo exportado desde Success Factors"
+        )
+    
+    with col2:
+        st.subheader("📤 Archivo 2")
+        excel_file = st.file_uploader(
+            "Excel Reporte 45",
+            type=['xlsx', 'xls'],
+            key="excel1",
+            help="Reporte 45 exportado desde SAP"
+        )
+    
+    if csv_file and excel_file:
+        st.divider()
+        
+        if st.button("🚀 PROCESAR ARCHIVOS", use_container_width=True, type="primary"):
+            try:
+                with st.spinner('⏳ Procesando archivos...'):
+                    temp_dir = tempfile.mkdtemp()
+                    
+                    csv_path = os.path.join(temp_dir, "input.csv")
+                    excel_path = os.path.join(temp_dir, "reporte45.xlsx")
+                    
+                    with open(csv_path, "wb") as f:
+                        f.write(csv_file.getbuffer())
+                    with open(excel_path, "wb") as f:
+                        f.write(excel_file.getbuffer())
+                    
+                    import auditoria_ausentismos_part1 as part1
+                    import importlib
+                    importlib.reload(part1)
+                    
+                    part1.ruta_entrada_csv = csv_path
+                    part1.ruta_entrada_excel = excel_path
+                    part1.directorio_salida = temp_dir
+                    part1.archivo_salida = "ausentismo_procesado_completo_v2.csv"
+                    part1.ruta_completa_salida = os.path.join(temp_dir, "ausentismo_procesado_completo_v2.csv")
+                    
+                    df_resultado = part1.procesar_archivo_ausentismos()
+                    
+                    if df_resultado is not None:
+                        st.success("✅ Procesamiento completado exitosamente")
+                        
+                        col1, col2, col3, col4 = st.columns(4)
+                        with col1:
+                            st.metric("📊 Total Registros", f"{len(df_resultado):,}")
+                        with col2:
+                            st.metric("🔑 Llaves Únicas", f"{df_resultado['llave'].nunique():,}")
+                        with col3:
+                            alertas = (df_resultado['nombre_validador'] == 'ALERTA VALIDADOR NO ENCONTRADO').sum()
+                            st.metric("⚠️ Alertas", alertas)
+                        with col4:
+                            st.metric("📋 Columnas", len(df_resultado.columns))
+                        
+                        st.divider()
+                        st.subheader("👀 Vista Previa de Datos")
+                        st.dataframe(df_resultado.head(10), use_container_width=True)
+                        
+                        st.divider()
+                        st.subheader("📦 Descargar Resultados")
+                        
+                        archivo_salida = os.path.join(temp_dir, "ausentismo_procesado_completo_v2.csv")
+                        
+                        if os.path.exists(archivo_salida):
+                            zip_data = crear_zip_desde_archivos([archivo_salida])
+                            
+                            col1, col2 = st.columns([3, 1])
+                            with col1:
+                                st.download_button(
+                                    "📥 DESCARGAR ZIP - PASO 1",
+                                    zip_data,
+                                    "PASO_1_Procesado.zip",
+                                    "application/zip",
+                                    use_container_width=True,
+                                    type="primary"
+                                )
+                            with col2:
+                                if st.button("▶️ Siguiente", use_container_width=True):
+                                    st.session_state.paso_actual = 2
+                                    st.rerun()
+                    else:
+                        st.error("❌ Error en el procesamiento")
+            
+            except Exception as e:
+                st.error(f"❌ Error: {str(e)}")
+                with st.expander("🔍 Ver detalles"):
+                    import traceback
+                    st.code(traceback.format_exc())
+
+# ============================================================================
+# PASO 2: VALIDACIONES
+# ============================================================================
+def paso2():
+    mostrar_header_principal()
+    
+    st.markdown("""
+    <div class="paso-header">
+        <h2>🔗 PASO 2: Validaciones y Merge con Personal</h2>
+        <p>Cruza con datos de personal y ejecuta múltiples validaciones</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    with st.expander("ℹ️ ¿Qué hace este paso?", expanded=False):
+        st.write("**📥 Archivos de Entrada:**")
+        st.write("• CSV del Paso 1")
+        st.write("• Excel de Personal (MD_*.xlsx)")
+        
+        st.write("**📤 Archivos de Salida:**")
+        st.write("• relacion_laboral_con_validaciones.csv")
+        st.write("• Múltiples archivos Excel de alertas")
+        
+        st.write("**🔧 Validaciones:**")
+        st.write("• Validación SENA")
+        st.write("• Validación Ley 50")
+        st.write("• Validación de licencias (6 tipos)")
+    
+    st.warning("🔴 Este paso requiere 2 archivos")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("📤 Archivo 1")
+        csv_paso1 = st.file_uploader(
+            "CSV del Paso 1",
+            type=['csv'],
+            key="csv2"
+        )
+    
+    with col2:
+        st.subheader("📤 Archivo 2")
+        excel_personal = st.file_uploader(
+            "Excel de Personal",
+            type=['xlsx', 'xls'],
+            key="excel2"
+        )
+    
+    if csv_paso1 and excel_personal:
+        st.divider()
+        
+        if st.button("🚀 PROCESAR ARCHIVOS", use_container_width=True, type="primary"):
+            try:
+                with st.spinner('⏳ Procesando validaciones...'):
+                    temp_dir = tempfile.mkdtemp()
+                    
+                    csv_path = os.path.join(temp_dir, "ausentismo_procesado_completo_v2.csv")
+                    excel_path = os.path.join(temp_dir, "MD_personal.xlsx")
+                    
+                    with open(csv_path, "wb") as f:
+                        f.write(csv_paso1.getbuffer())
+                    with open(excel_path, "wb") as f:
+                        f.write(excel_personal.getbuffer())
+                    
+                    df_ausentismo = pd.read_csv(csv_path, encoding='utf-8-sig')
+                    df_personal = pd.read_excel(excel_path)
+                    
+                    st.info(f"📊 CSV: {len(df_ausentismo):,} | Excel: {len(df_personal):,}")
+                    
+                    col_num_pers = next((col for col in df_personal.columns if 'pers' in col.lower()), None)
+                    col_relacion = next((col for col in df_personal.columns if 'relaci' in col.lower() and 'labor' in col.lower()), None)
+                    
+                    if not col_num_pers or not col_relacion:
+                        st.error("❌ No se encontraron las columnas necesarias")
+                        st.stop()
+                    
+                    df_ausentismo['id_personal'] = df_ausentismo['id_personal'].astype(str).str.strip()
+                    df_personal[col_num_pers] = df_personal[col_num_pers].astype(str).str.strip()
+                    
+                    df = pd.merge(
+                        df_ausentismo,
+                        df_personal[[col_num_pers, col_relacion]],
+                        left_on='id_personal',
+                        right_on=col_num_pers,
+                        how='left'
+                    )
+                    
+                    if col_relacion != 'Relación laboral':
+                        df.rename(columns={col_relacion: 'Relación laboral'}, inplace=True)
+                    
+                    df = df[df['Relación laboral'].notna()]
+                    
+                    # Validaciones SENA
+                    df_aprendizaje = df[df['Relación laboral'].str.contains('Aprendizaje', case=False, na=False)].copy()
+                    conceptos_validos = ['Incapacidad gral SENA', 'Licencia de Maternidad SENA', 'Suspensión contrato SENA']
+                    df_errores_sena = df_aprendizaje[~df_aprendizaje['external_name_label'].isin(conceptos_validos)].copy()
+                    
+                    # Validaciones Ley 50
+                    df_ley50 = df[df['Relación laboral'].str.contains('Ley 50', case=False, na=False)].copy()
+                    prohibidos = ['Incapacidad gral SENA', 'Licencia de Maternidad SENA', 'Suspensión contrato SENA',
+                                 'Inca. Enfer Gral Integral', 'Prorr Inc/Enf Gral ntegra']
+                    df_errores_ley50 = df_ley50[df_ley50['external_name_label'].isin(prohibidos)].copy()
+                    
+                    # Columnas de validación
+                    df['licencia_paternidad'] = df.apply(
+                        lambda r: "Concepto Si Aplica" if r['external_name_label'] == "Licencia Paternidad" and r['calendar_days'] == '14' 
+                        else "Concepto No Aplica", axis=1)
+                    
+                    df['licencia_maternidad'] = df.apply(
+                        lambda r: "Concepto Si Aplica" if r['external_name_label'] == "Licencia Maternidad" and r['calendar_days'] == '126' 
+                        else "Concepto No Aplica", axis=1)
+                    
+                    df['ley_de_luto'] = df.apply(
+                        lambda r: "Concepto Si Aplica" if r['external_name_label'] == "Ley de luto" and r['quantity_in_days'] == '5' 
+                        else "Concepto No Aplica", axis=1)
+                    
+                    # Guardar archivos
+                    archivo_principal = os.path.join(temp_dir, "relacion_laboral_con_validaciones.csv")
+                    df.to_csv(archivo_principal, index=False, encoding='utf-8-sig')
+                    
+                    archivos_generados = [archivo_principal]
+                    
+                    if len(df_errores_sena) > 0:
+                        path = os.path.join(temp_dir, "Sena_error_validar.xlsx")
+                        df_errores_sena.to_excel(path, index=False)
+                        archivos_generados.append(path)
+                    
+                    if len(df_errores_ley50) > 0:
+                        path = os.path.join(temp_dir, "Ley_50_error_validar.xlsx")
+                        df_errores_ley50.to_excel(path, index=False)
+                        archivos_generados.append(path)
+                    
+                    st.success("✅ Validaciones completadas")
+                    
+                    col1, col2, col3, col4 = st.columns(4)
+                    with col1:
+                        st.metric("📊 Total", f"{len(df):,}")
+                    with col2:
+                        st.metric("🚨 Errores SENA", len(df_errores_sena))
+                    with col3:
+                        st.metric("🚨 Errores Ley 50", len(df_errores_ley50))
+                    with col4:
+                        st.metric("📁 Archivos", len(archivos_generados))
+                    
+                    st.divider()
+                    st.subheader("👀 Vista Previa")
+                    st.dataframe(df.head(10), use_container_width=True)
+                    
+                    st.divider()
+                    
+                    zip_data = crear_zip_desde_archivos(archivos_generados)
+                    
+                    col1, col2 = st.columns([3, 1])
+                    with col1:
+                        st.download_button(
+                            f"📥 DESCARGAR ZIP - PASO 2 ({len(archivos_generados)} archivos)",
+                            zip_data,
+                            "PASO_2_Validaciones.zip",
+                            "application/zip",
+                            use_container_width=True,
+                            type="primary"
+                        )
+                    with col2:
+                        if st.button("▶️ Siguiente", use_container_width=True):
+                            st.session_state.paso_actual = 3
+                            st.rerun()
+            
+            except Exception as e:
+                st.error(f"❌ Error: {str(e)}")
+                with st.expander("🔍 Ver detalles"):
+                    import traceback
+                    st.code(traceback.format_exc())
+
+# ============================================================================
+# PASO 3: REPORTE 45 Y CIE-10
+# ============================================================================
+def paso3():
+    mostrar_header_principal()
+    
+    st.markdown("""
+    <div class="paso-header">
+        <h2>🏥 PASO 3: Merge con Reporte 45 y CIE-10</h2>
+        <p>Enriquecimiento con diagnósticos y clasificación CIE-10</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    with st.expander("ℹ️ ¿Qué hace este paso?", expanded=False):
+        st.write("**📥 Archivos de Entrada:**")
+        st.write("• CSV del Paso 2")
+        st.write("• Excel Reporte 45")
+        st.write("• Excel CIE-10")
+        
+        st.write("**📤 Archivos de Salida:**")
+        st.write("• ausentismos_completo_con_cie10.csv")
+        st.write("• ALERTA_DIAGNOSTICO.xlsx")
+    
+    st.warning("🔴 Este paso requiere 3 archivos")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.subheader("📤 Archivo 1")
+        csv_paso2 = st.file_uploader("CSV del Paso 2", type=['csv'], key="csv3")
+    
+    with col2:
+        st.subheader("📤 Archivo 2")
+        excel_r45 = st.file_uploader("Excel Reporte 45", type=['xlsx', 'xls'], key="excel3")
+    
+    with col3:
+        st.subheader("📤 Archivo 3")
+        excel_cie10 = st.file_uploader("Excel CIE-10", type=['xlsx', 'xls'], key="excel4")
+    
+    if csv_paso2 and excel_r45 and excel_cie10:
+        st.divider()
+        st.success("✅ Los 3 archivos están listos")
+        
+        if st.button("🚀 PROCESAR ARCHIVOS", use_container_width=True, type="primary"):
+            try:
+                with st.spinner('⏳ Procesando...'):
+                    temp_dir = tempfile.mkdtemp()
+                    
+                    csv_path = os.path.join(temp_dir, "relacion_laboral_con_validaciones.csv")
+                    r45_path = os.path.join(temp_dir, "Reporte45.xlsx")
+                    cie10_path = os.path.join(temp_dir, "CIE10.xlsx")
+                    
+                    with open(csv_path, "wb") as f:
+                        f.write(csv_paso2.getbuffer())
+                    with open(r45_path, "wb") as f:
+                        f.write(excel_r45.getbuffer())
+                    with open(cie10_path, "wb") as f:
+                        f.write(excel_cie10.getbuffer())
+                    
+                    import auditoria_ausentismos_part3 as part3
+                    import importlib
+                    importlib.reload(part3)
+                    
+                    part3.ruta_relacion_laboral = csv_path
+                    part3.ruta_reporte_45_excel = r45_path
+                    part3.ruta_cie10 = cie10_path
+                    part3.directorio_salida = temp_dir
+                    part3.ruta_completa_salida = os.path.join(temp_dir, "ausentismos_completo_con_cie10.csv")
+                    part3.ruta_alertas = os.path.join(temp_dir, "ALERTA_DIAGNOSTICO.xlsx")
+                    
+                    df_resultado = part3.procesar_todo()
+                    
+                    if df_resultado is not None:
+                        st.success("✅ Proceso completado")
+                        
+                        alertas = (df_resultado['alerta_diagnostico'] == 'ALERTA DIAGNOSTICO').sum() if 'alerta_diagnostico' in df_resultado.columns else 0
+                        con_cie = df_resultado['cie10_codigo'].notna().sum() if 'cie10_codigo' in df_resultado.columns else 0
+                        
+                        col1, col2, col3, col4 = st.columns(4)
+                        with col1:
+                            st.metric("📊 Total", f"{len(df_resultado):,}")
+                        with col2:
+                            st.metric("🚨 Alertas", alertas)
+                        with col3:
+                            st.metric("🏥 Con CIE-10", con_cie)
+                        with col4:
+                            st.metric("📋 Columnas", len(df_resultado.columns))
+                        
+                        st.divider()
+                        st.subheader("👀 Vista Previa")
+                        st.dataframe(df_resultado.head(10), use_container_width=True)
+                        
+                        st.divider()
+                        
+                        archivo_final = os.path.join(temp_dir, "ausentismos_completo_con_cie10.csv")
+                        archivo_alertas = os.path.join(temp_dir, "ALERTA_DIAGNOSTICO.xlsx")
+                        
+                        archivos = [archivo_final]
+                        if os.path.exists(archivo_alertas):
+                            archivos.append(archivo_alertas)
+                        
+                        zip_data = crear_zip_desde_archivos(archivos)
+                        
+                        st.download_button(
+                            f"📥 DESCARGAR ZIP - PASO 3 ({len(archivos)} archivos)",
+                            zip_data,
+                            "PASO_3_CIE10.zip",
+                            "application/zip",
+                            use_container_width=True,
+                            type="primary"
+                        )
+                        
+                        st.balloons()
+                    else:
+                        st.error("❌ Error en el procesamiento")
+            
+            except Exception as e:
+                st.error(f"❌ Error: {str(e)}")
+                with st.expander("🔍 Ver detalles"):
+                    import traceback
+                    st.code(traceback.format_exc())
+
+# ============================================================================
+# SIDEBAR
+# ============================================================================
+with st.sidebar:
+    st.title("🧭 Navegación")
+    
+    st.divider()
+    
+    progreso = (st.session_state.paso_actual - 1) / 2 * 100
+    st.progress(progreso / 100)
+    st.write(f"**Progreso: {progreso:.0f}%**")
+    
+    st.divider()
+    
+    if st.button("📄 PASO 1: Procesamiento", use_container_width=True, 
+                 disabled=(st.session_state.paso_actual == 1)):
+        st.session_state.paso_actual = 1
+        st.rerun()
+    
+    if st.button("🔗 PASO 2: Validaciones", use_container_width=True,
+                 disabled=(st.session_state.paso_actual == 2)):
+        st.session_state.paso_actual = 2
+        st.rerun()
+    
+    if st.button("🏥 PASO 3: CIE-10", use_container_width=True,
+                 disabled=(st.session_state.paso_actual == 3)):
+        st.session_state.paso_actual = 3
+        st.rerun()
+    
+    st.divider()
+    
+    st.info("""
+    **📋 Flujo del Proceso**
+    
+    **PASO 1:** CSV + Excel → Procesado
+    
+    **PASO 2:** CSV + Personal → Validaciones
+    
+    **PASO 3:** CSV + R45 + CIE-10 → Final
+    """)
+    
+    st.divider()
+    
+    st.caption("📧 **Soporte**")
+    st.caption("Grupo Jerónimo Martins")
+
+# ============================================================================
+# MAIN
+# ============================================================================
+if st.session_state.paso_actual == 1:
+    paso1()
+elif st.session_state.paso_actual == 2:
+    paso2()
+elif st.session_state.paso_actual == 3:
+    paso3()
